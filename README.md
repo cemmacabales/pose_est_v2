@@ -1,6 +1,6 @@
 # Pose Estimation + Exercise Classifier
 
-## Mac (training machine) — run in order:
+## Desktop (training machine) — run in order:
 1. python check_deps.py
 2. python load_dataset.py
 3. python normalize_joints.py
