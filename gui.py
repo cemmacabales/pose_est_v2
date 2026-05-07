@@ -10,7 +10,10 @@ import time
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
-from tflite_runtime.interpreter import Interpreter
+try:
+    from tflite_runtime.interpreter import Interpreter
+except ImportError:
+    from ai_edge_litert.interpreter import Interpreter
 
 from joint_map import VICON_TO_MOVENET, MOVENET_JOINT_NAMES, EXERCISE_NAMES, COCO_SKELETON_EDGES
 
