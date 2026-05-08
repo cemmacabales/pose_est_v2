@@ -4,6 +4,7 @@ gui.py — Real-time pose estimation and exercise classification GUI for Raspber
 """
 
 import tkinter as tk
+from tkinter import ttk
 from collections import deque
 import time
 
@@ -57,6 +58,8 @@ tts = TTSEngine()
 logger = SessionLogger()
 tts.announce_session_start()
 
+_session_ended = False
+
 # ── Tkinter setup ───────────────────────────────────────────────────────────
 root = tk.Tk()
 root.title("Pose Estimation")
@@ -85,23 +88,50 @@ def _get_local_ip():
 def on_closing():
     import tkinter.messagebox as mb
     if mb.askyesno("End Session", "Are you sure you want to end the session?"):
-        _end_session()
-        root.destroy()
+        if _session_ended:
+            root.destroy()
+        else:
+            _end_session(from_closing=True)
 
 
-def _end_session():
+def _end_session(from_closing=False):
+    global _session_ended
+    if _session_ended:
+        return
+    _session_ended = True
+    end_session_btn.config(state=tk.DISABLED)
     tts.announce_session_end()
     session_data = logger.end_session()
     start_server(session_data)
     ip = _get_local_ip()
     url = f"http://{ip}:5000"
+    hostname = socket.gethostname()
+    mdns_url = f"http://{hostname}.local:5000"
     img = qrcode.make(url)
     photo = ImageTk.PhotoImage(img)
-    qr_label = tk.Label(root, image=photo)
+    top = tk.Toplevel(root)
+    top.title("Session Complete")
+    top.configure(bg="#1a1a1a")
+    top.resizable(False, False)
+    qr_label = tk.Label(top, image=photo, bg="#1a1a1a")
     qr_label.image = photo
-    qr_label.pack()
-    url_label = tk.Label(root, text=f"Scan to review session: {url}", fg="#FFFFFF", bg="#1a1a1a")
-    url_label.pack()
+    qr_label.pack(pady=10)
+    tk.Label(top, text=f"mDNS: {mdns_url}", fg="#FFFFFF", bg="#1a1a1a").pack()
+    tk.Label(top, text=f"IP: {url}", fg="#FFFFFF", bg="#1a1a1a").pack()
+    close_btn = tk.Button(top, text="Close", command=top.destroy)
+    close_btn.pack(pady=10)
+    if from_closing:
+        def _on_top_closing():
+            top.destroy()
+            root.destroy()
+        top.protocol("WM_DELETE_WINDOW", _on_top_closing)
+        close_btn.config(command=_on_top_closing)
+    top.update_idletasks()
+    w = top.winfo_width()
+    h = top.winfo_height()
+    x = (top.winfo_screenwidth() // 2) - (w // 2)
+    y = (top.winfo_screenheight() // 2) - (h // 2)
+    top.geometry(f"+{x}+{y}")
 
 
 def detect_cameras():
@@ -114,54 +144,28 @@ def detect_cameras():
     return cameras
 
 
-def show_camera_selector(cameras):
-    import tkinter.messagebox as mb
-    if not cameras:
-        mb.showerror("No Camera", "No cameras detected. Please connect a camera and restart.")
-        exit(1)
-    if len(cameras) == 1:
-        return cameras[0][0]
-
-    selected_index = cameras[0][0]
-
-    def on_ok():
-        nonlocal selected_index
-        sel = listbox.curselection()
-        if sel:
-            selected_index = cameras[sel[0]][0]
-        top.destroy()
-
-    top = tk.Toplevel(root)
-    top.title("Select Camera")
-    top.geometry("300x200")
-    top.transient(root)
-    top.grab_set()
-
-    tk.Label(top, text="Select a camera:", padx=10, pady=10).pack()
-
-    listbox = tk.Listbox(top)
-    for idx, label in cameras:
-        listbox.insert(tk.END, label)
-    listbox.select_set(0)
-    listbox.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
-
-    tk.Button(top, text="OK", command=on_ok).pack(pady=10)
-
-    root.wait_window(top)
-    return selected_index
-
-
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # ── Camera selection ────────────────────────────────────────────────────────
 cameras = detect_cameras()
-selected_index = show_camera_selector(cameras)
+
+if not cameras:
+    import tkinter.messagebox as mb
+    mb.showerror("No Camera", "No cameras detected. Please connect a camera and restart.")
+    exit(1)
+
+selected_index = cameras[0][0]
+_current_camera_index = selected_index
+_pending_camera_index = None
+_camera_values = [label for _, label in cameras]
 
 # ── Camera ──────────────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(selected_index)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+_running = True
 
 # ── Rolling buffer ──────────────────────────────────────────────────────────
 frame_buffer = deque(maxlen=30)
@@ -187,6 +191,68 @@ right_panel.pack_propagate(False)
 
 sidebar = tk.Frame(right_panel, bg="#212121", padx=20, pady=20)
 sidebar.pack(fill=tk.BOTH, expand=True)
+
+# 0. CAMERA selector
+camera_frame = tk.Frame(sidebar, bg="#212121")
+camera_frame.pack(fill=tk.X, pady=(0, 4))
+
+camera_selector_label = tk.Label(
+    camera_frame, text="CAMERA", font=("Helvetica", 11),
+    fg="#888888", bg="#212121", anchor="w"
+)
+camera_selector_label.pack(side=tk.LEFT)
+
+camera_selector = ttk.Combobox(
+    camera_frame, values=_camera_values,
+    state="readonly", width=12
+)
+camera_selector.set(f"Camera {_current_camera_index}")
+camera_selector.pack(side=tk.RIGHT)
+camera_selector.bind("<<ComboboxSelected>>", lambda e: _on_camera_selected())
+
+camera_status_label = tk.Label(
+    sidebar, text="", font=("Helvetica", 10),
+    fg="#FF6E40", bg="#212121", anchor="w"
+)
+camera_status_label.pack(fill=tk.X, pady=(0, 12))
+
+
+def _on_camera_selected():
+    global _pending_camera_index
+    selection = camera_selector.get()
+    try:
+        new_idx = int(selection.split()[-1])
+    except (ValueError, IndexError):
+        return
+    if new_idx != _current_camera_index:
+        _pending_camera_index = new_idx
+
+
+def _attempt_camera_switch():
+    global cap, _current_camera_index, _pending_camera_index
+    if _pending_camera_index is None:
+        return
+
+    new_index = _pending_camera_index
+    _pending_camera_index = None
+
+    if new_index == _current_camera_index:
+        return
+
+    new_cap = cv2.VideoCapture(new_index)
+    if not new_cap.isOpened():
+        camera_status_label.config(text=f"Camera {new_index} unavailable")
+        camera_selector.set(f"Camera {_current_camera_index}")
+        return
+
+    cap.release()
+    cap = new_cap
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    _current_camera_index = new_index
+    camera_status_label.config(text="")
+
 
 # 1. EXERCISE header
 exercise_header = tk.Label(
@@ -312,6 +378,13 @@ def draw_confidence_bar(confidence):
 # ── Main update loop ────────────────────────────────────────────────────────
 def update():
     global frame_counter
+
+    if not _running:
+        root.after(33, update)
+        return
+
+    # Safe camera switch between frames
+    _attempt_camera_switch()
 
     ret, frame = cap.read()
     if not ret:
