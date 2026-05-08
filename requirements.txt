@@ -5,3 +5,10 @@ opencv-python==4.13.0
 numpy==2.4.3
 Pillow==12.1.1
 tk
+gtts
+playsound==1.2.2
+qrcode[pil]
+flask
+google-generativeai
+python-dotenv
+

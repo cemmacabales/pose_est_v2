@@ -49,6 +49,7 @@ cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
 # ── Rolling buffer ──────────────────────────────────────────────────────────
 frame_buffer = deque(maxlen=30)
+prediction_buffer = deque(maxlen=10)
 MAPPED_INDICES = sorted(VICON_TO_MOVENET.values())
 
 # ── FPS ─────────────────────────────────────────────────────────────────────
@@ -266,10 +267,8 @@ def update():
     mapped_kps = []
     for m in MAPPED_INDICES:
         y, x, _conf = kps[m]
-        px = x * orig_w
-        py = y * orig_h
-        nx = px - hip_mid_x * orig_w
-        ny = py - hip_mid_y * orig_h
+        nx = x - hip_mid_x
+        ny = y - hip_mid_y
         mapped_kps.append([nx, ny])
 
     mapped_kps_arr = np.array(mapped_kps, dtype=np.float32)  # (12, 2)
@@ -290,17 +289,27 @@ def update():
         quality_idx = int(np.argmax(quality_out))
         exercise_conf = float(np.max(exercise_out))
 
-        # Map 0-based model output to 1-based EXERCISE_NAMES key
-        ex_name = EXERCISE_NAMES.get(exercise_idx + 1, "Unknown")
-        exercise_label.config(text=ex_name)
+        prediction_buffer.append((exercise_idx, quality_idx, exercise_conf))
 
-        if quality_idx == 1:
-            quality_badge.config(text="● CORRECT", fg="#69F0AE", bg="#1B5E20")
-        else:
-            quality_badge.config(text="● INCORRECT", fg="#FF8A80", bg="#B71C1C")
+        if len(prediction_buffer) >= 5:
+            exercise_indices = [p[0] for p in prediction_buffer]
+            quality_indices = [p[1] for p in prediction_buffer]
+            confidences = [p[2] for p in prediction_buffer]
 
-        draw_confidence_bar(exercise_conf)
-        confidence_label.config(text=f"{int(exercise_conf * 100)}%")
+            stable_exercise_idx = max(set(exercise_indices), key=exercise_indices.count)
+            stable_quality_idx = 1 if sum(quality_indices) > len(quality_indices) / 2 else 0
+            stable_confidence = sum(confidences) / len(confidences)
+
+            ex_name = EXERCISE_NAMES.get(stable_exercise_idx + 1, "Unknown")
+            exercise_label.config(text=ex_name)
+
+            if stable_quality_idx == 1:
+                quality_badge.config(text="● CORRECT", fg="#69F0AE", bg="#1B5E20")
+            else:
+                quality_badge.config(text="● INCORRECT", fg="#FF8A80", bg="#B71C1C")
+
+            draw_confidence_bar(stable_confidence)
+            confidence_label.config(text=f"{int(stable_confidence * 100)}%")
 
     # Update keypoints count
     keypoints_label.config(text=f"{detected_count} / 17 detected")
