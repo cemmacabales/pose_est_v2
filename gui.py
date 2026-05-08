@@ -13,9 +13,20 @@ from PIL import Image, ImageTk
 try:
     from tflite_runtime.interpreter import Interpreter
 except ImportError:
-    from ai_edge_litert.interpreter import Interpreter
+    try:
+        from ai_edge_litert.interpreter import Interpreter
+    except ImportError:
+        import tensorflow as tf
+        Interpreter = tf.lite.Interpreter
 
 from joint_map import VICON_TO_MOVENET, MOVENET_JOINT_NAMES, EXERCISE_NAMES, COCO_SKELETON_EDGES
+
+from tts_engine import TTSEngine
+from session_logger import SessionLogger
+from session_chat.app import start_server
+import qrcode
+import socket
+import threading
 
 # ── Load models (before window appears) ─────────────────────────────────────
 print("Loading MoveNet...")
@@ -41,8 +52,113 @@ for idx, detail in enumerate(classifier_out):
     elif detail["shape"][1] == 2:
         quality_out_idx = idx
 
+# Initialize TTS and session logger
+tts = TTSEngine()
+logger = SessionLogger()
+tts.announce_session_start()
+
+# ── Tkinter setup ───────────────────────────────────────────────────────────
+root = tk.Tk()
+root.title("Pose Estimation")
+root.geometry("1100x620")
+root.configure(bg="#1a1a1a")
+root.resizable(False, False)
+
+
+def add_spacer(parent, height):
+    s = tk.Frame(parent, height=height, bg="#212121")
+    s.pack(fill=tk.X, pady=0)
+    return s
+
+
+def _get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def on_closing():
+    import tkinter.messagebox as mb
+    if mb.askyesno("End Session", "Are you sure you want to end the session?"):
+        _end_session()
+        root.destroy()
+
+
+def _end_session():
+    tts.announce_session_end()
+    session_data = logger.end_session()
+    start_server(session_data)
+    ip = _get_local_ip()
+    url = f"http://{ip}:5000"
+    img = qrcode.make(url)
+    photo = ImageTk.PhotoImage(img)
+    qr_label = tk.Label(root, image=photo)
+    qr_label.image = photo
+    qr_label.pack()
+    url_label = tk.Label(root, text=f"Scan to review session: {url}", fg="#FFFFFF", bg="#1a1a1a")
+    url_label.pack()
+
+
+def detect_cameras():
+    cameras = []
+    for i in range(6):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            cameras.append((i, f"Camera {i}"))
+        cap.release()
+    return cameras
+
+
+def show_camera_selector(cameras):
+    import tkinter.messagebox as mb
+    if not cameras:
+        mb.showerror("No Camera", "No cameras detected. Please connect a camera and restart.")
+        exit(1)
+    if len(cameras) == 1:
+        return cameras[0][0]
+
+    selected_index = cameras[0][0]
+
+    def on_ok():
+        nonlocal selected_index
+        sel = listbox.curselection()
+        if sel:
+            selected_index = cameras[sel[0]][0]
+        top.destroy()
+
+    top = tk.Toplevel(root)
+    top.title("Select Camera")
+    top.geometry("300x200")
+    top.transient(root)
+    top.grab_set()
+
+    tk.Label(top, text="Select a camera:", padx=10, pady=10).pack()
+
+    listbox = tk.Listbox(top)
+    for idx, label in cameras:
+        listbox.insert(tk.END, label)
+    listbox.select_set(0)
+    listbox.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+
+    tk.Button(top, text="OK", command=on_ok).pack(pady=10)
+
+    root.wait_window(top)
+    return selected_index
+
+
+root.protocol("WM_DELETE_WINDOW", on_closing)
+
+# ── Camera selection ────────────────────────────────────────────────────────
+cameras = detect_cameras()
+selected_index = show_camera_selector(cameras)
+
 # ── Camera ──────────────────────────────────────────────────────────────────
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(selected_index)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -55,13 +171,6 @@ MAPPED_INDICES = sorted(VICON_TO_MOVENET.values())
 # ── FPS ─────────────────────────────────────────────────────────────────────
 fps_times = deque(maxlen=30)
 frame_counter = 0
-
-# ── Tkinter setup ───────────────────────────────────────────────────────────
-root = tk.Tk()
-root.title("Pose Estimation")
-root.geometry("1100x620")
-root.configure(bg="#1a1a1a")
-root.resizable(False, False)
 
 # Left panel (camera feed)
 left_panel = tk.Frame(root, width=720, height=620, bg="#1a1a1a")
@@ -78,13 +187,6 @@ right_panel.pack_propagate(False)
 
 sidebar = tk.Frame(right_panel, bg="#212121", padx=20, pady=20)
 sidebar.pack(fill=tk.BOTH, expand=True)
-
-
-def add_spacer(parent, height):
-    s = tk.Frame(parent, height=height, bg="#212121")
-    s.pack(fill=tk.X, pady=0)
-    return s
-
 
 # 1. EXERCISE header
 exercise_header = tk.Label(
@@ -178,9 +280,16 @@ fps_label.pack(fill=tk.X)
 # 16. QUIT button at bottom
 quit_btn = tk.Button(
     sidebar, text="QUIT", width=20,
-    bg="#333333", fg="#FFFFFF", command=root.destroy
+    bg="#333333", fg="#FFFFFF", command=on_closing
 )
 quit_btn.pack(side=tk.BOTTOM, pady=(20, 0))
+
+# 17. End Session button
+end_session_btn = tk.Button(
+    sidebar, text="End Session", width=20,
+    bg="#B71C1C", fg="#FFFFFF", command=_end_session
+)
+end_session_btn.pack(side=tk.BOTTOM, pady=(20, 0))
 
 
 # ── Helper: redraw confidence bar ───────────────────────────────────────────
@@ -310,6 +419,10 @@ def update():
 
             draw_confidence_bar(stable_confidence)
             confidence_label.config(text=f"{int(stable_confidence * 100)}%")
+
+            exercise_name = EXERCISE_NAMES.get(stable_exercise_idx + 1, "Unknown")
+            tts.update(exercise_name, stable_quality_idx, time.time())
+            logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
 
     # Update keypoints count
     keypoints_label.config(text=f"{detected_count} / 17 detected")

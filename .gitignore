@@ -4,3 +4,13 @@ UI-PRMD/
 data/
 models/*.keras
 *.env
+venv/
+.env/
+.venv/
+env/
+ENV/
+logs/
+.env
+/tmp/*.mp3
+smoke_test_qr.png
+smoke_test_chat.py
