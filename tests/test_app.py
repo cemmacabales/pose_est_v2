@@ -1,7 +1,7 @@
 import os
 
 # Set fake key BEFORE importing llm-related modules so EnvironmentError is not raised.
-os.environ["GEMINI_API_KEY"] = "test-fake-key"
+os.environ["GROQ_API_KEY"] = "test-fake-groq-key"
 
 import pytest
 from unittest.mock import patch

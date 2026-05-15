@@ -1,18 +1,30 @@
 from flask import Flask, jsonify, request, render_template_string
 from session_chat.llm import ChatSession
+from session_chat.retrieval import RetrievalEngine
 import threading
 
 # Module-level state
 _chat_session = None
 _session_data = None
+_retrieval_engine = None
 
 app = Flask(__name__)
 
 
 def init_app(session_data: dict):
-    global _chat_session, _session_data
+    global _chat_session, _session_data, _retrieval_engine
     _session_data = session_data
-    _chat_session = ChatSession(session_data)
+
+    # Try to initialize the retrieval engine; if knowledge base is missing,
+    # the chat will gracefully fall back to session-only responses.
+    try:
+        _retrieval_engine = RetrievalEngine()
+    except FileNotFoundError as e:
+        print(f"[APP WARNING] Knowledge base not found: {e}")
+        print("  Chat will run without PDF retrieval. Run build_knowledge_base.py first.")
+        _retrieval_engine = None
+
+    _chat_session = ChatSession(session_data, retrieval_engine=_retrieval_engine)
 
 
 @app.route("/")
