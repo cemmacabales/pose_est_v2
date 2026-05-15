@@ -541,7 +541,7 @@
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar ' + sender;
-    avatar.textContent = sender === 'user' ? '&#128100;' : '&#129302;';
+    avatar.textContent = sender === 'user' ? '\ud83d\udc64' : '\ud83e\udd16';
 
     const contentWrapper = document.createElement('div');
     contentWrapper.style.display = 'flex';
@@ -577,7 +577,7 @@
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar assistant';
-    avatar.textContent = '&#129302;';
+    avatar.textContent = '\ud83e\udd16';
 
     const bubble = document.createElement('div');
     bubble.className = 'typing-bubble';
