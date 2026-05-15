@@ -86,6 +86,18 @@ def test_prompt_instructs_citations():
     assert "cite your sources" in prompt.lower()
 
 
+def test_prompt_forbids_outside_knowledge():
+    prompt = build_system_prompt(FAKE_SESSION, retrieved_chunks=FAKE_RETRIEVED)
+    assert "NO general world knowledge" in prompt
+    assert "sports" in prompt.lower()
+    assert "NEVER use your pre-trained knowledge" in prompt
+
+
+def test_prompt_requires_refusal_for_off_topic():
+    prompt = build_system_prompt(FAKE_SESSION, retrieved_chunks=FAKE_RETRIEVED)
+    assert "can only answer questions about your workout" in prompt
+
+
 def _mock_groq_reply(reply_text: str):
     """Build a mock Groq client that returns *reply_text*."""
     mock_choice = MagicMock()
