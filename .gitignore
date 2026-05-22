@@ -42,10 +42,8 @@ load_dataset.py
 normalize_joints.py
 check_deps.py
 
-# ── Documentation / Notes ──
+# ── Data collection checklist (internal team doc) ──
 DATA_COLLECTION_CHECKLIST.md
-HANDOFF.md
-RETRAIN_PROGRESS.md
 
 # ── Debug / Smoke test ──
 smoke_test_chat.py
