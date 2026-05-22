@@ -2,12 +2,7 @@ import os
 import json
 from datetime import datetime
 
-EXERCISE_NAMES = {
-    1: "Deep Squat", 2: "Hurdle Step", 3: "Inline Lunge",
-    4: "Side Lunge", 5: "Sit to Stand", 6: "Standing Leg Raise",
-    7: "Shoulder Abduction", 8: "Shoulder Extension",
-    9: "Shoulder Rotation", 10: "Shoulder Scaption"
-}
+from joint_map import EXERCISE_NAMES
 
 
 class SessionLogger:
@@ -18,7 +13,7 @@ class SessionLogger:
         self.current_segment = None
 
     def log_frame(self, exercise_idx: int, quality: int, confidence: float):
-        exercise_name = EXERCISE_NAMES.get(exercise_idx + 1, "Unknown")
+        exercise_name = EXERCISE_NAMES.get(exercise_idx, "Unknown")
         if self.current_segment is None or exercise_name != self.current_segment["name"]:
             if self.current_segment is not None:
                 self.segments.append(self.current_segment)

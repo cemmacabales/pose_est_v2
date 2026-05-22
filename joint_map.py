@@ -28,12 +28,15 @@ MOVENET_JOINT_NAMES = {
 }
 
 EXERCISE_NAMES = {
-    1: "Deep Squat",         2: "Hurdle Step",
-    3: "Inline Lunge",       4: "Side Lunge",
-    5: "Sit to Stand",       6: "Standing Leg Raise",
-    7: "Shoulder Abduction", 8: "Shoulder Extension",
-    9: "Shoulder Rotation",  10: "Shoulder Scaption",
-    0: "Unknown",
+    0: "Deep Squat",
+    1: "Hurdle Step",
+    2: "Inline Lunge",
+    3: "Side Lunge",
+    4: "Sit to Stand",
+    5: "Standing Leg Raise",
+    6: "Shoulder Abduction",
+    7: "Shoulder Extension",
+    8: "Shoulder Scaption",
 }
 
 COCO_SKELETON_EDGES = [

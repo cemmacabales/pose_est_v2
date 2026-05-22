@@ -29,20 +29,20 @@ def _make_interpreter_mock():
             # Classifier
             inst.get_input_details.return_value = [{"index": 0, "shape": [1, 30, 24]}]
             inst.get_output_details.return_value = [
-                {"index": 1, "shape": [1, 10]},
+                {"index": 1, "shape": [1, 9]},
                 {"index": 2, "shape": [1, 2]},
             ]
 
             def _get_tensor(idx):
                 if idx == 1:
-                    out = np.zeros((1, 10), dtype=np.float32)
+                    out = np.zeros((1, 9), dtype=np.float32)
                     out[0, 0] = 0.9
                     return out
                 elif idx == 2:
                     out = np.zeros((1, 2), dtype=np.float32)
                     out[0, 1] = 0.9
                     return out
-                return np.zeros((1, 10), dtype=np.float32)
+                return np.zeros((1, 9), dtype=np.float32)
 
             inst.get_tensor.side_effect = _get_tensor
 

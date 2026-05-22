@@ -43,11 +43,10 @@ source .venv/bin/activate
 # Install dependencies
 pip install ai-edge-litert opencv-python numpy Pillow \
             gtts "playsound==1.2.2" "qrcode[pil]" \
-            flask google-genai python-dotenv pytest
+            flask google-genai python-dotenv pytest \
+            groq onnxruntime tokenizers
 
 sudo apt install espeak -y
-pip install gtts "playsound==1.2.2" "qrcode[pil]" flask \
-            google-genai python-dotenv pytest
 
 echo ""
 echo "IMPORTANT: Authenticate with Google Cloud for Vertex AI:"

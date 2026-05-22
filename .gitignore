@@ -1,16 +1,58 @@
+# ── Python ──
 __pycache__/
 *.pyc
-UI-PRMD/
-data/
-models/*.keras
+
+# ── Environment ──
 *.env
 venv/
-.env/
 .venv/
 env/
 ENV/
+
+# ── Logs / Temp ──
 logs/
-.env
 /tmp/*.mp3
-smoke_test_qr.png
+
+# ── Data / Datasets (too large, built externally) ──
+data/
+UI-PRMD/
+Penn_Action/
+
+# ── Training input videos ──
+eval/
+trained_videos/
+
+# ── Data collection checklists ──
+data_collection/
+
+# ── Source PDF references (knowledge base is pre-built) ──
+references/
+
+# ── Intermediate model artifacts (RPi only needs .tflite) ──
+models/*.keras
+
+# ── Training / build scripts (not needed on RPi) ──
+train_classifier.py
+export_models.py
+build_windows.py
+build_knowledge_base.py
+extract_video_keypoints.py
+preprocess_train_videos.py
+load_dataset.py
+normalize_joints.py
+check_deps.py
+
+# ── Documentation / Notes ──
+DATA_COLLECTION_CHECKLIST.md
+HANDOFF.md
+RETRAIN_PROGRESS.md
+
+# ── Debug / Smoke test ──
 smoke_test_chat.py
+smoke_test_qr.png
+
+# ── System / IDE ──
+.DS_Store
+.python-version
+.zshrc
+.bashrc

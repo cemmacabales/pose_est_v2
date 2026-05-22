@@ -48,7 +48,7 @@ classifier_out = classifier.get_output_details()
 exercise_out_idx = None
 quality_out_idx = None
 for idx, detail in enumerate(classifier_out):
-    if detail["shape"][1] == 10:
+    if detail["shape"][1] == 9:
         exercise_out_idx = idx
     elif detail["shape"][1] == 2:
         quality_out_idx = idx
@@ -464,7 +464,7 @@ def update():
         classifier.set_tensor(classifier_in[0]["index"], window)
         classifier.invoke()
 
-        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]  # (10,)
+        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]  # (9,)
         quality_out = classifier.get_tensor(classifier_out[quality_out_idx]["index"])[0]    # (2,)
 
         exercise_idx = int(np.argmax(exercise_out))
@@ -482,7 +482,7 @@ def update():
             stable_quality_idx = 1 if sum(quality_indices) > len(quality_indices) / 2 else 0
             stable_confidence = sum(confidences) / len(confidences)
 
-            ex_name = EXERCISE_NAMES.get(stable_exercise_idx + 1, "Unknown")
+            ex_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
             exercise_label.config(text=ex_name)
 
             if stable_quality_idx == 1:
@@ -493,7 +493,7 @@ def update():
             draw_confidence_bar(stable_confidence)
             confidence_label.config(text=f"{int(stable_confidence * 100)}%")
 
-            exercise_name = EXERCISE_NAMES.get(stable_exercise_idx + 1, "Unknown")
+            exercise_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
 
