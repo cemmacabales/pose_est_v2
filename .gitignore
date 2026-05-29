@@ -15,7 +15,12 @@ logs/
 /tmp/*.mp3
 
 # ── Data / Datasets (too large, generated locally) ──
-data/
+data/**
+!data/knowledge_base.json
+!data/embeddings.npy
+!data/chunks.jsonl
+!data/embedding_model/
+!data/embedding_model/**
 UI-PRMD/
 Penn_Action/
 
