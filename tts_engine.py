@@ -33,19 +33,20 @@ class TTSEngine:
         self._last_correct_cue_time = None
         self._was_incorrect = False
 
-        self._audio_device = self._probe_audio()
+        self._audio_device, self._use_pipewire = self._probe_audio()
 
     # ── Audio device detection ──────────────────────────────────────────────
 
     @staticmethod
     def _probe_audio():
-        """Detect available audio output devices. Returns the best device
-        ID string for platform-specific playback, or None if none found."""
+        """Detect available audio output devices. Returns (device_id, use_pipewire)
+        tuple. device_id is the ALSA device string (or None), use_pipewire is True
+        if PulseAudio/PipeWire sinks are available."""
         if sys.platform == "darwin":
-            return TTSEngine._probe_mac()
+            return (None, False)
         elif sys.platform == "linux":
             return TTSEngine._probe_linux()
-        return None
+        return (None, False)
 
     @staticmethod
     def _probe_mac():
@@ -73,33 +74,30 @@ class TTSEngine:
 
     @staticmethod
     def _probe_linux():
-        """Probe Linux audio devices (PulseAudio > ALSA).
-        Returns ALSA device ID string or None."""
+        """Probe Linux audio devices (PipeWire/PulseAudio > ALSA).
+        Returns (alsa_device, use_pipewire) tuple."""
         sinks = TTSEngine._probe_pulse()
         if sinks:
             display_names = [s["display"] for s in sinks if ".monitor" not in s["name"]]
             print(f"[TTS] PulseAudio sinks: {', '.join(display_names) if display_names else 'none'}")
 
-            # Prefer non-HDMI sink for TTS
             for s in sinks:
                 if ".monitor" in s["name"]:
                     continue
                 if "hdmi" not in s["name"].lower():
-                    print(f"[TTS] Using: {s['display']}")
-                    return s["alsa"]
-            # Fallback to any non-monitor sink
-            for s in sinks:
-                if ".monitor" not in s["name"]:
-                    print(f"[TTS] Using: {s['display']}")
-                    return s["alsa"]
+                    print(f"[TTS] Using PipeWire/PulseAudio: {s['display']}")
+                    break
+
+            alsa = TTSEngine._probe_alsa() or "default"
+            return (alsa, True)
 
         alsa = TTSEngine._probe_alsa()
         if alsa:
             print(f"[TTS] ALSA device: {alsa}")
-            return alsa
+            return (alsa, False)
 
         print("[TTS] Audio: no outputs detected — TTS may be silent")
-        return None
+        return (None, False)
 
     @staticmethod
     def _probe_pulse():
@@ -178,6 +176,52 @@ class TTSEngine:
             subprocess.run(["afplay", filepath])
             return
 
+        # Linux: try PipeWire/PulseAudio-native playback first
+        if self._use_pipewire:
+            if filepath.endswith(".mp3"):
+                wav_path = filepath.rsplit('.', 1)[0] + '.wav'
+                try:
+                    subprocess.run(
+                        ["ffmpeg", "-i", filepath, "-y", "-loglevel", "error", wav_path],
+                        timeout=15
+                    )
+                    if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                        try:
+                            subprocess.run(["paplay", wav_path], timeout=15)
+                            try:
+                                os.remove(wav_path)
+                            except OSError:
+                                pass
+                            return
+                        except Exception:
+                            pass
+                        try:
+                            subprocess.run(["pw-play", wav_path], timeout=15)
+                            try:
+                                os.remove(wav_path)
+                            except OSError:
+                                pass
+                            return
+                        except Exception:
+                            pass
+                        try:
+                            os.remove(wav_path)
+                        except OSError:
+                            pass
+                except Exception:
+                    pass
+            else:
+                try:
+                    subprocess.run(["paplay", filepath], timeout=15)
+                    return
+                except Exception:
+                    pass
+                try:
+                    subprocess.run(["pw-play", filepath], timeout=15)
+                    return
+                except Exception:
+                    pass
+
         # Linux: try playsound first (uses system default PulseAudio sink)
         if playsound is not None:
             try:
@@ -227,13 +271,44 @@ class TTSEngine:
 
     def _speak_fallback(self, text):
         """System TTS fallback. Uses say (macOS) or espeak (Linux).
-        Linux: tries aplay -D <device>, then plain aplay, then espeak raw.
-        If all fail, prints warning and continues gracefully."""
+        Linux: tries paplay (PipeWire-native), then pw-play, then ALSA aplay
+        chain, then raw espeak. If all fail, prints warning and continues."""
         if sys.platform == "darwin":
             subprocess.run(["say", text])
             return
 
-        # Linux: try espeak piped through aplay with detected device
+        # Linux: try PipeWire/PulseAudio-native playback first
+        if self._use_pipewire:
+            try:
+                wav_path = f"/tmp/tts_{os.getpid()}.wav"
+                subprocess.run(["espeak", "-w", wav_path, text], timeout=15)
+                if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                    try:
+                        subprocess.run(["paplay", wav_path], timeout=15)
+                        try:
+                            os.remove(wav_path)
+                        except OSError:
+                            pass
+                        return
+                    except Exception:
+                        pass
+                    try:
+                        subprocess.run(["pw-play", wav_path], timeout=15)
+                        try:
+                            os.remove(wav_path)
+                        except OSError:
+                            pass
+                        return
+                    except Exception:
+                        pass
+                    try:
+                        os.remove(wav_path)
+                    except OSError:
+                        pass
+            except Exception:
+                pass
+
+        # Linux: try espeak piped through aplay with detected ALSA device
         if self._audio_device:
             try:
                 proc = subprocess.Popen(
