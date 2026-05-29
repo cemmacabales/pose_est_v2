@@ -43,11 +43,16 @@ def _resolve_model_path(model_complexity):
 
 class PoseEstimator:
     def __init__(self, model_complexity=1, min_detection_confidence=0.5,
-                 min_tracking_confidence=0.5, static_image_mode=False):
+                 min_tracking_confidence=0.5, static_image_mode=False,
+                 running_mode="image"):
         model_path = _resolve_model_path(model_complexity)
+        if running_mode == "video":
+            mode = vision.RunningMode.VIDEO
+        else:
+            mode = vision.RunningMode.IMAGE
         options = vision.PoseLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=model_path),
-            running_mode=vision.RunningMode.IMAGE,
+            running_mode=mode,
             num_poses=1,
             min_pose_detection_confidence=min_detection_confidence,
             min_pose_presence_confidence=0.5,
@@ -55,13 +60,17 @@ class PoseEstimator:
             output_segmentation_masks=False,
         )
         self.landmarker = vision.PoseLandmarker.create_from_options(options)
+        self._video_mode = (running_mode == "video")
 
-    def process_frame(self, frame):
+    def process_frame(self, frame, timestamp_ms=None):
         """Run BlazePose on a BGR frame.
         Returns list of 33 NormalizedLandmark objects or None if no person detected."""
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result = self.landmarker.detect(mp_image)
+        if self._video_mode and timestamp_ms is not None:
+            result = self.landmarker.detect_for_video(mp_image, int(timestamp_ms))
+        else:
+            result = self.landmarker.detect(mp_image)
         if result.pose_landmarks and len(result.pose_landmarks) > 0:
             return result.pose_landmarks[0]
         return None

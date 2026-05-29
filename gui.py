@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import queue
 import tkinter as tk
 from tkinter import ttk
 from collections import deque
@@ -45,10 +46,7 @@ args, _ = parser.parse_known_args()
 MODEL_COMPLEXITY = 0 if args.model == "lite" else 1
 print(f"Model: {args.model} (complexity={MODEL_COMPLEXITY})")
 
-TARGET_WIDTH = 640
-TARGET_HEIGHT = 480
-
-pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY)
+pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="video")
 
 print("Loading classifier...")
 classifier = Interpreter(model_path="./models/classifier.tflite")
@@ -65,17 +63,40 @@ for idx, detail in enumerate(classifier_out):
     elif detail["shape"][1] == 2:
         quality_out_idx = idx
 
+_classifier_input_queue = queue.Queue(maxsize=1)
+_classifier_output_queue = queue.Queue(maxsize=1)
+
+
+def _classifier_worker():
+    while True:
+        window_data = _classifier_input_queue.get()
+        if window_data is None:
+            break
+        classifier.set_tensor(classifier_in[0]["index"], window_data)
+        classifier.invoke()
+        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]
+        quality_out = classifier.get_tensor(classifier_out[quality_out_idx]["index"])[0]
+        exercise_idx = int(np.argmax(exercise_out))
+        quality_idx = int(np.argmax(quality_out))
+        exercise_conf = float(np.max(exercise_out))
+        while not _classifier_output_queue.empty():
+            try:
+                _classifier_output_queue.get_nowait()
+            except queue.Empty:
+                break
+        _classifier_output_queue.put((exercise_idx, quality_idx, exercise_conf))
+
+
+_classifier_thread = threading.Thread(target=_classifier_worker, daemon=True)
+_classifier_thread.start()
+
 tts = TTSEngine()
 logger = SessionLogger()
 tts.announce_session_start()
 
 _session_ended = False
 
-root = tk.Tk()
-root.title("Pose Estimation")
-root.geometry("1100x620")
-root.configure(bg="#1a1a1a")
-root.resizable(False, False)
+SIDEBAR_WIDTH = 380
 
 
 def add_spacer(parent, height):
@@ -154,8 +175,6 @@ def detect_cameras():
     return cameras
 
 
-root.protocol("WM_DELETE_WINDOW", on_closing)
-
 cameras = detect_cameras()
 
 if not cameras:
@@ -169,15 +188,18 @@ _pending_camera_index = None
 _camera_values = [label for _, label in cameras]
 
 cap = cv2.VideoCapture(selected_index)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
 _actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-if _actual_w != TARGET_WIDTH or _actual_h != TARGET_HEIGHT:
-    print(f"Warning: camera reported {_actual_w}x{_actual_h} (expected {TARGET_WIDTH}x{TARGET_HEIGHT}). "
-          f"Frames will be downscaled before BlazePose.")
+print(f"Camera {selected_index}: {_actual_w}x{_actual_h}")
+
+root = tk.Tk()
+root.title("Pose Estimation")
+root.geometry(f"{_actual_w + SIDEBAR_WIDTH}x{_actual_h}")
+root.configure(bg="#1a1a1a")
+root.resizable(False, False)
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 _running = True
 
@@ -187,14 +209,14 @@ prediction_buffer = deque(maxlen=10)
 fps_times = deque(maxlen=30)
 frame_counter = 0
 
-left_panel = tk.Frame(root, width=720, height=620, bg="#1a1a1a")
+left_panel = tk.Frame(root, width=_actual_w, height=_actual_h, bg="#1a1a1a")
 left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 left_panel.pack_propagate(False)
 
 camera_label = tk.Label(left_panel, bg="#1a1a1a")
 camera_label.pack(expand=True, fill=tk.BOTH)
 
-right_panel = tk.Frame(root, width=380, height=620, bg="#212121")
+right_panel = tk.Frame(root, width=SIDEBAR_WIDTH, height=_actual_h, bg="#212121")
 right_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 right_panel.pack_propagate(False)
 
@@ -223,6 +245,13 @@ camera_status_label = tk.Label(
     fg="#FF6E40", bg="#212121", anchor="w"
 )
 camera_status_label.pack(fill=tk.X, pady=(0, 12))
+
+
+def _update_layout(w, h):
+    root.geometry(f"{w + SIDEBAR_WIDTH}x{h}")
+    left_panel.config(width=w, height=h)
+    right_panel.config(height=h)
+    camera_label.config(width=w, height=h)
 
 
 def _on_camera_selected():
@@ -255,16 +284,13 @@ def _attempt_camera_switch():
 
     cap.release()
     cap = new_cap
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     _current_camera_index = new_index
     _actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    if _actual_w != TARGET_WIDTH or _actual_h != TARGET_HEIGHT:
-        print(f"Warning: camera {new_index} reported {_actual_w}x{_actual_h} (expected {TARGET_WIDTH}x{TARGET_HEIGHT}). "
-              f"Frames will be downscaled before BlazePose.")
+    print(f"Camera {new_index}: {_actual_w}x{_actual_h}")
     camera_status_label.config(text="")
+    _update_layout(_actual_w, _actual_h)
 
 
 exercise_header = tk.Label(
@@ -368,14 +394,6 @@ def draw_confidence_bar(confidence):
         confidence_canvas.create_rectangle(0, 0, fill_w, 24, fill=color, outline="")
 
 
-def _prepare_frame_for_pose(raw_frame):
-    """Downscale frame to TARGET_WIDTH x TARGET_HEIGHT before BlazePose if needed."""
-    h, w = raw_frame.shape[:2]
-    if w != TARGET_WIDTH or h != TARGET_HEIGHT:
-        return cv2.resize(raw_frame, (TARGET_WIDTH, TARGET_HEIGHT))
-    return raw_frame
-
-
 def update():
     global frame_counter
 
@@ -390,14 +408,13 @@ def update():
         root.after(33, update)
         return
 
-    frame = _prepare_frame_for_pose(raw_frame)
-
     now = time.time()
     fps_times.append(now)
 
-    lm = pose_est.process_frame(frame)
+    timestamp_ms = int(now * 1000)
+    lm = pose_est.process_frame(raw_frame, timestamp_ms=timestamp_ms)
 
-    display_frame = frame.copy()
+    display_frame = raw_frame.copy()
     disp_h, disp_w = display_frame.shape[:2]
 
     if lm is not None:
@@ -414,19 +431,21 @@ def update():
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
         window = angles[np.newaxis, :, :]
-        classifier.set_tensor(classifier_in[0]["index"], window)
-        classifier.invoke()
+        if _classifier_input_queue.empty():
+            try:
+                _classifier_input_queue.put_nowait(window)
+            except queue.Full:
+                pass
 
-        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]
-        quality_out = classifier.get_tensor(classifier_out[quality_out_idx]["index"])[0]
+    if not _classifier_output_queue.empty():
+        try:
+            result = _classifier_output_queue.get_nowait()
+            stable_exercise_idx, stable_quality_idx, stable_confidence = result
+            prediction_buffer.append(result)
+        except queue.Empty:
+            result = None
 
-        exercise_idx = int(np.argmax(exercise_out))
-        quality_idx = int(np.argmax(quality_out))
-        exercise_conf = float(np.max(exercise_out))
-
-        prediction_buffer.append((exercise_idx, quality_idx, exercise_conf))
-
-        if len(prediction_buffer) >= 5:
+        if result is not None and len(prediction_buffer) >= 5:
             exercise_indices = [p[0] for p in prediction_buffer]
             quality_indices = [p[1] for p in prediction_buffer]
             confidences = [p[2] for p in prediction_buffer]
@@ -460,12 +479,11 @@ def update():
 
     rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb_frame)
-    pil_img = pil_img.resize((720, 620), Image.LANCZOS)
     imgtk = ImageTk.PhotoImage(image=pil_img)
     camera_label.imgtk = imgtk
     camera_label.config(image=imgtk)
 
-    root.after(33, update)
+    root.after(10, update)
 
 
 root.after(0, update)

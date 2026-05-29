@@ -67,13 +67,13 @@ def gui_mod():
     fake_frame = np.zeros((480, 640, 3), dtype=np.uint8)
     mock_cap = MagicMock()
     mock_cap.read.return_value = (True, fake_frame)
+    mock_cap.get.side_effect = lambda prop: 640 if prop == 3 else (480 if prop == 4 else 0)
 
     mock_interpreter = _make_interpreter_mock()
     mock_pose_estimator_cls, mock_pose_estimator_inst = _make_pose_estimator_mock()
 
     mock_cv2 = MagicMock()
     mock_cv2.VideoCapture.return_value = mock_cap
-    mock_cv2.resize.side_effect = lambda img, size: np.zeros((size[1], size[0], 3), dtype=np.uint8)
     mock_cv2.cvtColor.side_effect = lambda img, code: img
     mock_cv2.CAP_PROP_FRAME_WIDTH = 3
     mock_cv2.CAP_PROP_FRAME_HEIGHT = 4
@@ -160,6 +160,8 @@ def _run_one_inference_iteration(gui_mod):
 
     for _ in range(5):
         gui_mod.prediction_buffer.append((0, 1, 0.9))
+
+    gui_mod._classifier_output_queue.put((0, 1, 0.9))
 
     gui_mod.frame_counter = 4
 
