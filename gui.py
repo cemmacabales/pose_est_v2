@@ -3,11 +3,9 @@
 gui.py — Real-time pose estimation and exercise classification GUI for Raspberry Pi 5.
 
 Usage:
-    python gui.py                     # default: lite model, no skeleton overlay
-    python gui.py --model lite        # same as above
-    python gui.py --model full        # full model (desktop/M2)
-    python gui.py --show-skeleton     # draw skeleton overlay (costs FPS)
-    python gui.py --debug             # print per-frame timing breakdown
+    python gui.py              # default: lite model (RPi 5 optimized)
+    python gui.py --model lite # same as above
+    python gui.py --model full # full model (desktop/M2)
 """
 
 import argparse
@@ -43,18 +41,10 @@ import threading
 parser = argparse.ArgumentParser(description="Pose Estimation + Exercise Classification GUI")
 parser.add_argument("--model", choices=["lite", "full"], default="lite",
                     help="BlazePose model complexity: lite (RPi) or full (desktop)")
-parser.add_argument("--show-skeleton", action="store_true", default=False,
-                    help="Draw skeleton overlay on video feed (reduces FPS)")
-parser.add_argument("--debug", action="store_true", default=False,
-                    help="Print per-frame timing breakdown")
 args, _ = parser.parse_known_args()
 
 MODEL_COMPLEXITY = 0 if args.model == "lite" else 1
-SHOW_SKELETON = args.show_skeleton
-DEBUG = args.debug
 print(f"Model: {args.model} (complexity={MODEL_COMPLEXITY})")
-print(f"Skeleton overlay: {'ON' if SHOW_SKELETON else 'OFF'}")
-print(f"Debug timing: {'ON' if DEBUG else 'OFF'}")
 
 pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="video")
 
@@ -403,7 +393,7 @@ def draw_confidence_bar(confidence):
     if fill_w > 0:
         confidence_canvas.create_rectangle(0, 0, fill_w, 24, fill=color, outline="")
 
-BLAZEPOSE_MAX_DIM = 480
+BLAZEPOSE_MAX_DIM = 640
 
 
 def _scale_for_blazepose(raw_frame):
@@ -418,7 +408,6 @@ def _scale_for_blazepose(raw_frame):
 
 def update():
     global frame_counter
-    t_start = time.perf_counter() if DEBUG else 0
 
     if not _running:
         root.after(33, update)
@@ -426,9 +415,7 @@ def update():
 
     _attempt_camera_switch()
 
-    t_read_start = time.perf_counter()
     ret, raw_frame = cap.read()
-    t_read = (time.perf_counter() - t_read_start) * 1000
     if not ret:
         root.after(33, update)
         return
@@ -437,20 +424,14 @@ def update():
     fps_times.append(now)
 
     timestamp_ms = int(now * 1000)
-    t_scale_start = time.perf_counter()
     pose_frame = _scale_for_blazepose(raw_frame)
-    t_scale = (time.perf_counter() - t_scale_start) * 1000
-
-    t_pose_start = time.perf_counter()
     lm = pose_est.process_frame(pose_frame, timestamp_ms=timestamp_ms)
-    t_pose = (time.perf_counter() - t_pose_start) * 1000
 
     display_frame = raw_frame.copy()
+    disp_h, disp_w = display_frame.shape[:2]
 
-    t_draw_start = time.perf_counter()
-    if SHOW_SKELETON and lm is not None:
+    if lm is not None:
         pose_est.draw_landmarks(display_frame, lm)
-    t_draw = (time.perf_counter() - t_draw_start) * 1000
 
     visible = PoseEstimator.count_visible(lm, threshold=0.5)
 
@@ -459,9 +440,7 @@ def update():
         frame_buffer.append(joints)
 
     frame_counter += 1
-    t_classifier = 0
     if len(frame_buffer) == 30 and frame_counter % 8 == 0:
-        t_cls_start = time.perf_counter()
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
         window = angles[np.newaxis, :, :]
@@ -470,7 +449,6 @@ def update():
                 _classifier_input_queue.put_nowait(window)
             except queue.Full:
                 pass
-        t_classifier = (time.perf_counter() - t_cls_start) * 1000
 
     if not _classifier_output_queue.empty():
         try:
@@ -512,22 +490,13 @@ def update():
         fps = 0.0
     fps_label.config(text=f"{fps:.1f}")
 
-    t_convert_start = time.perf_counter()
     rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb_frame)
     imgtk = ImageTk.PhotoImage(image=pil_img)
     camera_label.imgtk = imgtk
     camera_label.config(image=imgtk)
-    t_convert = (time.perf_counter() - t_convert_start) * 1000
 
-    if DEBUG:
-        t_total = (time.perf_counter() - t_start) * 1000
-        print(f"frame {frame_counter:4d} | "
-              f"read: {t_read:5.1f}ms pose: {t_pose:5.1f}ms draw: {t_draw:5.1f}ms "
-              f"cls: {t_classifier:5.1f}ms convert: {t_convert:5.1f}ms "
-              f"total: {t_total:5.1f}ms | fps: {fps:.1f}")
-
-    root.after(16, update)
+    root.after(10, update)
 
 
 root.after(0, update)
