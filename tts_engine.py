@@ -4,9 +4,7 @@ import threading
 import subprocess
 import tempfile
 import os
-import time
 
-# Try-import gTTS and playsound — offline mode still works if unavailable
 try:
     from gtts import gTTS
 except ImportError:
@@ -20,7 +18,6 @@ except ImportError:
 
 class TTSEngine:
     def __init__(self):
-        # Check internet connectivity
         try:
             socket.create_connection(("8.8.8.8", 53), timeout=2)
             self.online = True
@@ -36,56 +33,207 @@ class TTSEngine:
         self._last_correct_cue_time = None
         self._was_incorrect = False
 
+        self._audio_device = self._probe_audio()
+
+    # ── Audio device detection ──────────────────────────────────────────────
+
+    @staticmethod
+    def _probe_audio():
+        """Detect available audio output devices. Returns the best device
+        ID string for platform-specific playback, or None if none found."""
+        if sys.platform == "darwin":
+            return TTSEngine._probe_mac()
+        elif sys.platform == "linux":
+            return TTSEngine._probe_linux()
+        return None
+
+    @staticmethod
+    def _probe_mac():
+        """Probe macOS audio outputs. Prints diagnostic, returns None
+        (macOS auto-switches — afplay/say use system default)."""
+        try:
+            out = subprocess.run(
+                ["system_profiler", "SPAudioDataType"],
+                capture_output=True, text=True, timeout=5
+            )
+            outputs = []
+            for line in out.stdout.split('\n'):
+                if 'Output Source:' in line:
+                    name = line.split(':', 1)[1].strip()
+                    if name:
+                        outputs.append(name)
+            if outputs:
+                print(f"[TTS] Audio outputs: {', '.join(outputs)}")
+                print(f"[TTS] Using system default (macOS auto-switches)")
+            else:
+                print("[TTS] Audio: using system default (no explicit outputs detected)")
+        except Exception:
+            print("[TTS] Audio: could not probe outputs, using system default")
+        return None
+
+    @staticmethod
+    def _probe_linux():
+        """Probe Linux audio devices (PulseAudio > ALSA).
+        Returns ALSA device ID string or None."""
+        sinks = TTSEngine._probe_pulse()
+        if sinks:
+            display_names = [s["display"] for s in sinks if ".monitor" not in s["name"]]
+            print(f"[TTS] PulseAudio sinks: {', '.join(display_names) if display_names else 'none'}")
+
+            # Prefer non-HDMI sink for TTS
+            for s in sinks:
+                if ".monitor" in s["name"]:
+                    continue
+                if "hdmi" not in s["name"].lower():
+                    print(f"[TTS] Using: {s['display']}")
+                    return s["alsa"]
+            # Fallback to any non-monitor sink
+            for s in sinks:
+                if ".monitor" not in s["name"]:
+                    print(f"[TTS] Using: {s['display']}")
+                    return s["alsa"]
+
+        alsa = TTSEngine._probe_alsa()
+        if alsa:
+            print(f"[TTS] ALSA device: {alsa}")
+            return alsa
+
+        print("[TTS] Audio: no outputs detected — TTS may be silent")
+        return None
+
+    @staticmethod
+    def _probe_pulse():
+        """Return list of dicts {name, display, alsa} from PulseAudio."""
+        try:
+            out = subprocess.run(
+                ["pactl", "list", "short", "sinks"],
+                capture_output=True, text=True, timeout=5
+            )
+            sinks = []
+            for line in out.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    sinks.append({
+                        "name": parts[1].strip(),
+                        "display": parts[1].strip(),
+                        "alsa": "default",
+                    })
+            return sinks
+        except Exception:
+            return []
+
+    @staticmethod
+    def _probe_alsa():
+        """Return first ALSA hardware device ID (e.g. 'hw:0,0') or None."""
+        try:
+            out = subprocess.run(
+                ["aplay", "-l"],
+                capture_output=True, text=True, timeout=5
+            )
+            for line in out.stdout.split('\n'):
+                m = __import__('re').search(r'card\s+(\d+):.*device\s+(\d+):', line.lower())
+                if m:
+                    return f"hw:{m.group(1)},{m.group(2)}"
+        except Exception:
+            pass
+        return None
+
+    # ── Audio playback ──────────────────────────────────────────────────────
+
     def _play_audio(self, text: str):
-        """Private method. Called inside a daemon thread by speak()."""
         self._speaking = True
         try:
-            if self.online:
-                # Online: use gTTS to generate and play MP3
-                if gTTS is not None:
-                    tts = gTTS(text=text, lang="en")
-                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
-                        tmp_path = fp.name
-                    tts.save(tmp_path)
-
-                    if sys.platform == "darwin":
-                        subprocess.run(["afplay", tmp_path])
-                    elif sys.platform == "linux":
-                        if playsound is not None:
-                            playsound.playsound(tmp_path)
-                        else:
-                            # Fallback if playsound missing on Linux
-                            subprocess.run(["espeak", text])
-
+            if self.online and gTTS is not None:
+                mp3_path = self._generate_tts(text)
+                if mp3_path:
+                    self._play_file(mp3_path)
                     try:
-                        os.remove(tmp_path)
+                        os.remove(mp3_path)
                     except OSError:
                         pass
-                else:
-                    # gTTS unavailable — fallback to system TTS
-                    if sys.platform == "darwin":
-                        subprocess.run(["say", text])
-                    elif sys.platform == "linux":
-                        subprocess.run(["espeak", text])
-            else:
-                # Offline fallback
-                if sys.platform == "darwin":
-                    subprocess.run(["say", text])
-                elif sys.platform == "linux":
-                    subprocess.run(["espeak", text])
+                    return
+            self._speak_fallback(text)
         finally:
             self._speaking = False
 
+    def _generate_tts(self, text):
+        tts = gTTS(text=text, lang="en")
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as fp:
+            path = fp.name
+        tts.save(path)
+        return path
+
+    def _play_file(self, filepath):
+        """Play an audio file using the best available method."""
+        if sys.platform == "darwin":
+            subprocess.run(["afplay", filepath])
+            return
+
+        # Linux: try playsound first (uses system default PulseAudio sink)
+        if playsound is not None:
+            try:
+                playsound.playsound(filepath)
+                return
+            except Exception:
+                pass
+
+        # Linux: try ffmpeg → wav → aplay with detected device
+        if self._audio_device:
+            try:
+                wav_path = filepath.rsplit('.', 1)[0] + '.wav'
+                subprocess.run(
+                    ['ffmpeg', '-i', filepath, '-y', '-loglevel', 'error', wav_path],
+                    timeout=15
+                )
+                if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                    subprocess.run(['aplay', '-D', self._audio_device, wav_path])
+                    try:
+                        os.remove(wav_path)
+                    except OSError:
+                        pass
+                    return
+            except Exception:
+                pass
+
+        # Last resort — try espeak (or mpg123 for mp3 files)
+        text = "Audio playback failed"
+        self._speak_fallback(text)
+
+    def _speak_fallback(self, text):
+        """System TTS fallback. Uses say (macOS) or espeak (Linux)."""
+        if sys.platform == "darwin":
+            subprocess.run(["say", text])
+            return
+
+        # Linux: pipe espeak through aplay if device is known
+        if self._audio_device:
+            try:
+                proc = subprocess.Popen(
+                    ["espeak", "--stdout", text],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+                )
+                subprocess.run(
+                    ["aplay", "-D", self._audio_device],
+                    stdin=proc.stdout, timeout=15
+                )
+                proc.wait()
+                return
+            except Exception:
+                pass
+
+        subprocess.run(["espeak", text])
+
+    # ── Public API ──────────────────────────────────────────────────────────
+
     def speak(self, text: str):
-        """Speak the given text. Skips if already speaking (no queue)."""
         if self._speaking:
             return
         t = threading.Thread(target=self._play_audio, args=(text,), daemon=True)
         t.start()
 
     def update(self, exercise_name: str, quality: int, timestamp: float):
-        """Called every frame from gui.py."""
-        # --- Exercise announcement ---
         if exercise_name != self._pending_exercise:
             self._pending_exercise = exercise_name
             self._pending_since = timestamp
@@ -98,7 +246,6 @@ class TTSEngine:
             self.speak(f"{exercise_name} detected")
             self._last_exercise = exercise_name
 
-        # --- INCORRECT streak ---
         if quality == 0:
             if self._incorrect_streak_start is None:
                 self._incorrect_streak_start = timestamp

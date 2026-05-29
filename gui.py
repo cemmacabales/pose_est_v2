@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
 gui.py — Real-time pose estimation and exercise classification GUI for Raspberry Pi 5.
+
+Usage:
+    python gui.py              # default: lite model (RPi 5 optimized)
+    python gui.py --model lite # same as above
+    python gui.py --model full # full model (desktop/M2)
 """
 
+import argparse
 import tkinter as tk
 from tkinter import ttk
 from collections import deque
@@ -20,7 +26,9 @@ except ImportError:
         import tensorflow as tf
         Interpreter = tf.lite.Interpreter
 
-from joint_map import VICON_TO_MOVENET, MOVENET_JOINT_NAMES, EXERCISE_NAMES, COCO_SKELETON_EDGES
+from pose_estimator import PoseEstimator
+from joint_map import EXERCISE_NAMES
+from joint_angles import batch_keypoints_to_angles
 
 from tts_engine import TTSEngine
 from session_logger import SessionLogger
@@ -29,22 +37,26 @@ import qrcode
 import socket
 import threading
 
-# ── Load models (before window appears) ─────────────────────────────────────
-print("Loading MoveNet...")
-movenet = Interpreter(model_path="./models/movenet_thunder_int8.tflite")
-movenet.allocate_tensors()
+parser = argparse.ArgumentParser(description="Pose Estimation + Exercise Classification GUI")
+parser.add_argument("--model", choices=["lite", "full"], default="lite",
+                    help="BlazePose model complexity: lite (RPi) or full (desktop)")
+args, _ = parser.parse_known_args()
+
+MODEL_COMPLEXITY = 0 if args.model == "lite" else 1
+print(f"Model: {args.model} (complexity={MODEL_COMPLEXITY})")
+
+TARGET_WIDTH = 640
+TARGET_HEIGHT = 480
+
+pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY)
 
 print("Loading classifier...")
 classifier = Interpreter(model_path="./models/classifier.tflite")
 classifier.allocate_tensors()
 
-movenet_in = movenet.get_input_details()
-movenet_out = movenet.get_output_details()
-
 classifier_in = classifier.get_input_details()
 classifier_out = classifier.get_output_details()
 
-# Determine which classifier output is exercise / quality by shape
 exercise_out_idx = None
 quality_out_idx = None
 for idx, detail in enumerate(classifier_out):
@@ -53,14 +65,12 @@ for idx, detail in enumerate(classifier_out):
     elif detail["shape"][1] == 2:
         quality_out_idx = idx
 
-# Initialize TTS and session logger
 tts = TTSEngine()
 logger = SessionLogger()
 tts.announce_session_start()
 
 _session_ended = False
 
-# ── Tkinter setup ───────────────────────────────────────────────────────────
 root = tk.Tk()
 root.title("Pose Estimation")
 root.geometry("1100x620")
@@ -146,7 +156,6 @@ def detect_cameras():
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
-# ── Camera selection ────────────────────────────────────────────────────────
 cameras = detect_cameras()
 
 if not cameras:
@@ -159,24 +168,25 @@ _current_camera_index = selected_index
 _pending_camera_index = None
 _camera_values = [label for _, label in cameras]
 
-# ── Camera ──────────────────────────────────────────────────────────────────
 cap = cv2.VideoCapture(selected_index)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+_actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+_actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+if _actual_w != TARGET_WIDTH or _actual_h != TARGET_HEIGHT:
+    print(f"Warning: camera reported {_actual_w}x{_actual_h} (expected {TARGET_WIDTH}x{TARGET_HEIGHT}). "
+          f"Frames will be downscaled before BlazePose.")
 
 _running = True
 
-# ── Rolling buffer ──────────────────────────────────────────────────────────
 frame_buffer = deque(maxlen=30)
 prediction_buffer = deque(maxlen=10)
-MAPPED_INDICES = sorted(VICON_TO_MOVENET.values())
 
-# ── FPS ─────────────────────────────────────────────────────────────────────
 fps_times = deque(maxlen=30)
 frame_counter = 0
 
-# Left panel (camera feed)
 left_panel = tk.Frame(root, width=720, height=620, bg="#1a1a1a")
 left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 left_panel.pack_propagate(False)
@@ -184,7 +194,6 @@ left_panel.pack_propagate(False)
 camera_label = tk.Label(left_panel, bg="#1a1a1a")
 camera_label.pack(expand=True, fill=tk.BOTH)
 
-# Right panel (stats sidebar)
 right_panel = tk.Frame(root, width=380, height=620, bg="#212121")
 right_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 right_panel.pack_propagate(False)
@@ -192,7 +201,6 @@ right_panel.pack_propagate(False)
 sidebar = tk.Frame(right_panel, bg="#212121", padx=20, pady=20)
 sidebar.pack(fill=tk.BOTH, expand=True)
 
-# 0. CAMERA selector
 camera_frame = tk.Frame(sidebar, bg="#212121")
 camera_frame.pack(fill=tk.X, pady=(0, 4))
 
@@ -229,7 +237,7 @@ def _on_camera_selected():
 
 
 def _attempt_camera_switch():
-    global cap, _current_camera_index, _pending_camera_index
+    global cap, _current_camera_index, _pending_camera_index, _actual_w, _actual_h
     if _pending_camera_index is None:
         return
 
@@ -247,110 +255,98 @@ def _attempt_camera_switch():
 
     cap.release()
     cap = new_cap
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, TARGET_WIDTH)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, TARGET_HEIGHT)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     _current_camera_index = new_index
+    _actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    if _actual_w != TARGET_WIDTH or _actual_h != TARGET_HEIGHT:
+        print(f"Warning: camera {new_index} reported {_actual_w}x{_actual_h} (expected {TARGET_WIDTH}x{TARGET_HEIGHT}). "
+              f"Frames will be downscaled before BlazePose.")
     camera_status_label.config(text="")
 
 
-# 1. EXERCISE header
 exercise_header = tk.Label(
     sidebar, text="EXERCISE", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
 )
 exercise_header.pack(fill=tk.X)
 
-# 2. Exercise name
 exercise_label = tk.Label(
     sidebar, text="Detecting...", font=("Helvetica", 22, "bold"),
     fg="#FFFFFF", bg="#212121", anchor="w"
 )
 exercise_label.pack(fill=tk.X)
 
-# 3. Spacer 16px
 add_spacer(sidebar, 16)
 
-# 4. QUALITY header
 quality_header = tk.Label(
     sidebar, text="QUALITY", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
 )
 quality_header.pack(fill=tk.X)
 
-# 5. Quality badge
 quality_badge = tk.Label(
-    sidebar, text="● WAITING", font=("Helvetica", 16, "bold"),
+    sidebar, text="WAITING", font=("Helvetica", 16, "bold"),
     fg="#888888", bg="#333333", padx=16, pady=8, anchor="w"
 )
 quality_badge.pack(fill=tk.X)
 
-# 6. Spacer 16px
 add_spacer(sidebar, 16)
 
-# 7. CONFIDENCE header
 confidence_header = tk.Label(
     sidebar, text="CONFIDENCE", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
 )
 confidence_header.pack(fill=tk.X)
 
-# 8. Confidence bar canvas
 confidence_canvas = tk.Canvas(
     sidebar, width=320, height=24,
     bg="#212121", highlightthickness=0
 )
 confidence_canvas.pack(fill=tk.X, pady=(4, 0))
 
-# 9. Confidence percentage
 confidence_label = tk.Label(
     sidebar, text="0%", font=("Helvetica", 13),
     fg="#CCCCCC", bg="#212121", anchor="w"
 )
 confidence_label.pack(fill=tk.X, pady=(2, 0))
 
-# 10. Spacer 24px
 add_spacer(sidebar, 24)
 
-# 11. KEYPOINTS header
 keypoints_header = tk.Label(
     sidebar, text="KEYPOINTS", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
 )
 keypoints_header.pack(fill=tk.X)
 
-# 12. Keypoints count
 keypoints_label = tk.Label(
-    sidebar, text="0 / 17 detected", font=("Helvetica", 14),
+    sidebar, text="0 / 33 detected", font=("Helvetica", 14),
     fg="#FFFFFF", bg="#212121", anchor="w"
 )
 keypoints_label.pack(fill=tk.X)
 
-# 13. Spacer 24px
 add_spacer(sidebar, 24)
 
-# 14. FPS header
 fps_header = tk.Label(
     sidebar, text="FPS", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
 )
 fps_header.pack(fill=tk.X)
 
-# 15. FPS value
 fps_label = tk.Label(
     sidebar, text="0", font=("Helvetica", 14),
     fg="#FFFFFF", bg="#212121", anchor="w"
 )
 fps_label.pack(fill=tk.X)
 
-# 16. QUIT button at bottom
 quit_btn = tk.Button(
     sidebar, text="QUIT", width=20,
     bg="#333333", fg="#FFFFFF", command=on_closing
 )
 quit_btn.pack(side=tk.BOTTOM, pady=(20, 0))
 
-# 17. End Session button
 end_session_btn = tk.Button(
     sidebar, text="End Session", width=20,
     bg="#B71C1C", fg="#FFFFFF", command=_end_session
@@ -358,12 +354,9 @@ end_session_btn = tk.Button(
 end_session_btn.pack(side=tk.BOTTOM, pady=(20, 0))
 
 
-# ── Helper: redraw confidence bar ───────────────────────────────────────────
 def draw_confidence_bar(confidence):
     confidence_canvas.delete("all")
-    # Background
     confidence_canvas.create_rectangle(0, 0, 320, 24, fill="#333333", outline="")
-    # Fill
     fill_w = int(confidence * 320)
     if confidence >= 0.75:
         color = "#69F0AE"
@@ -375,7 +368,14 @@ def draw_confidence_bar(confidence):
         confidence_canvas.create_rectangle(0, 0, fill_w, 24, fill=color, outline="")
 
 
-# ── Main update loop ────────────────────────────────────────────────────────
+def _prepare_frame_for_pose(raw_frame):
+    """Downscale frame to TARGET_WIDTH x TARGET_HEIGHT before BlazePose if needed."""
+    h, w = raw_frame.shape[:2]
+    if w != TARGET_WIDTH or h != TARGET_HEIGHT:
+        return cv2.resize(raw_frame, (TARGET_WIDTH, TARGET_HEIGHT))
+    return raw_frame
+
+
 def update():
     global frame_counter
 
@@ -383,89 +383,42 @@ def update():
         root.after(33, update)
         return
 
-    # Safe camera switch between frames
     _attempt_camera_switch()
 
-    ret, frame = cap.read()
+    ret, raw_frame = cap.read()
     if not ret:
         root.after(33, update)
         return
 
-    # FPS timestamp
+    frame = _prepare_frame_for_pose(raw_frame)
+
     now = time.time()
     fps_times.append(now)
 
-    # Original dimensions
-    orig_h, orig_w = frame.shape[:2]
+    lm = pose_est.process_frame(frame)
 
-    # MoveNet input
-    mn_frame = cv2.resize(frame, (256, 256))
-    mn_input = np.expand_dims(mn_frame, axis=0).astype(np.uint8)
-    movenet.set_tensor(movenet_in[0]["index"], mn_input)
-    movenet.invoke()
-    kps = movenet.get_tensor(movenet_out[0]["index"])[0][0]  # (17, 3) [y, x, conf]
-
-    # Resize to 640x480 for display
-    display_frame = cv2.resize(frame, (640, 480))
+    display_frame = frame.copy()
     disp_h, disp_w = display_frame.shape[:2]
 
-    # Count detected keypoints
-    detected_count = 0
-    for i in range(17):
-        if kps[i][2] > 0.3:
-            detected_count += 1
+    if lm is not None:
+        pose_est.draw_landmarks(display_frame, lm)
 
-    # Draw skeleton edges (white, thickness 2)
-    for edge in COCO_SKELETON_EDGES:
-        i, j = edge
-        y1, x1, c1 = kps[i]
-        y2, x2, c2 = kps[j]
-        if c1 > 0.3 and c2 > 0.3:
-            px1 = int(x1 * disp_w)
-            py1 = int(y1 * disp_h)
-            px2 = int(x2 * disp_w)
-            py2 = int(y2 * disp_h)
-            cv2.line(display_frame, (px1, py1), (px2, py2), (255, 255, 255), 2)
+    visible = PoseEstimator.count_visible(lm, threshold=0.5)
 
-    # Draw keypoints
-    for i in range(17):
-        y, x, conf = kps[i]
-        if conf > 0.3:
-            px = int(x * disp_w)
-            py = int(y * disp_h)
-            if i in MOVENET_JOINT_NAMES:
-                # Blue #4FC3F7  -> BGR (247, 195, 79)
-                cv2.circle(display_frame, (px, py), 7, (247, 195, 79), -1)
-            else:
-                # Gray #888888 -> BGR (136, 136, 136)
-                cv2.circle(display_frame, (px, py), 4, (136, 136, 136), -1)
+    if lm is not None:
+        joints = PoseEstimator.extract_mapped_joints(lm)
+        frame_buffer.append(joints)
 
-    # Extract 12 mapped keypoints, normalize by hip midpoint
-    left_hip = kps[11]
-    right_hip = kps[12]
-    hip_mid_x = (left_hip[1] + right_hip[1]) / 2.0
-    hip_mid_y = (left_hip[0] + right_hip[0]) / 2.0
-
-    mapped_kps = []
-    for m in MAPPED_INDICES:
-        y, x, _conf = kps[m]
-        nx = x - hip_mid_x
-        ny = y - hip_mid_y
-        mapped_kps.append([nx, ny])
-
-    mapped_kps_arr = np.array(mapped_kps, dtype=np.float32)  # (12, 2)
-    frame_buffer.append(mapped_kps_arr)
-
-    # Run classifier every 5th frame when buffer is full
     frame_counter += 1
     if len(frame_buffer) == 30 and frame_counter % 5 == 0:
-        window = np.array(frame_buffer, dtype=np.float32)  # (30, 12, 2)
-        window = window.reshape(1, 30, 24)
+        window = np.array(frame_buffer, dtype=np.float32)
+        angles = batch_keypoints_to_angles(window)
+        window = angles[np.newaxis, :, :]
         classifier.set_tensor(classifier_in[0]["index"], window)
         classifier.invoke()
 
-        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]  # (9,)
-        quality_out = classifier.get_tensor(classifier_out[quality_out_idx]["index"])[0]    # (2,)
+        exercise_out = classifier.get_tensor(classifier_out[exercise_out_idx]["index"])[0]
+        quality_out = classifier.get_tensor(classifier_out[quality_out_idx]["index"])[0]
 
         exercise_idx = int(np.argmax(exercise_out))
         quality_idx = int(np.argmax(quality_out))
@@ -486,9 +439,9 @@ def update():
             exercise_label.config(text=ex_name)
 
             if stable_quality_idx == 1:
-                quality_badge.config(text="● CORRECT", fg="#69F0AE", bg="#1B5E20")
+                quality_badge.config(text="CORRECT", fg="#69F0AE", bg="#1B5E20")
             else:
-                quality_badge.config(text="● INCORRECT", fg="#FF8A80", bg="#B71C1C")
+                quality_badge.config(text="INCORRECT", fg="#FF8A80", bg="#B71C1C")
 
             draw_confidence_bar(stable_confidence)
             confidence_label.config(text=f"{int(stable_confidence * 100)}%")
@@ -497,17 +450,14 @@ def update():
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
 
-    # Update keypoints count
-    keypoints_label.config(text=f"{detected_count} / 17 detected")
+    keypoints_label.config(text=f"{visible} / 33 detected")
 
-    # Update FPS
     if len(fps_times) > 1:
         fps = len(fps_times) / (fps_times[-1] - fps_times[0])
     else:
         fps = 0.0
     fps_label.config(text=f"{fps:.1f}")
 
-    # Convert to PIL and resize to fill left panel
     rgb_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(rgb_frame)
     pil_img = pil_img.resize((720, 620), Image.LANCZOS)
@@ -518,9 +468,7 @@ def update():
     root.after(33, update)
 
 
-# Start
 root.after(0, update)
 root.mainloop()
 
-# Cleanup
 cap.release()

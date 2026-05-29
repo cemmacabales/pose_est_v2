@@ -1,92 +1,463 @@
-# Handoff Document — Round 2 Retraining Session
+# Handoff Document — Session: Fine-Tuning Complete + RPi Deployment Ready
 
-**Date:** 2026-05-22
-**Status:** All phases complete. 174 videos collected, model retrained, TFLite exported, RPi-ready.
-
----
-
-## What Was Accomplished
-
-Completed data collection (Phase 6) and retrained the pose exercise classifier (Phase 7)
-with **174 real-world videos from 5 people**, replacing the 26-video initial model with
-a diverse 5-person, camera-angle, and incorrect-form dataset.
-
-### Phases Completed
-
-| Phase | Status | Summary |
-|-------|--------|---------|
-| **Phase 6** | Done | Collected 174 videos from 5 people across all 9 exercises |
-| **Phase 7** | Done | Extracted keypoints, built windows (451K), trained model, exported TFLite |
-| **Deploy** | Done | `.gitignore` cleaned, `rpi_setup.sh` simplified, pushed and ready for RPi |
+**Date:** 2026-05-29
+**Status:** Fine-tuning done. Export done. All RPi deployment fixes applied. 47 tests pass. Ready to push.
 
 ---
 
-## Data Collection Results
+## Session 3: Fine-Tuning + RPi Deployment Fixes
 
-### Actual vs Planned
+### Completed Tasks
 
-| Person | Expected | Actual | Notes |
-|--------|----------|--------|-------|
-| Person 1 | 30 | 33 | Extra front/lateral variants |
-| Person 2 | 30 | 37 | Left/right splits for each incorrect mistake |
-| Person 3 | 30 | 47 | Left/right splits — most overshoot |
-| Person 4 | 30 | 28 | 2 videos short, descriptive filenames |
-| Person 5 | 30 | 30 | Exact naming convention |
-| **TOTAL** | **150** | **174** | |
+1. **extract_test_keypoints.py** — Created and executed. Extracted keypoints from 26 test videos, mapped filenames to exercise IDs using case-insensitive substring matching (per handoff mapping table). All test videos labeled as `correct` quality. Output: 26 `.npy` files in `data/normalized/`, `data/labels.csv` now has 200 entries.
 
-### Per-Exercise Distribution
+2. **build_windows.py** — Re-ran with expanded dataset. Result: **485,485 windows** (up from 374,570), ~111K new windows from test videos.
 
-| Exercise | Correct | Incorrect | Total | People |
-|----------|---------|-----------|-------|--------|
-| 01 Deep Squat | 12 | 10 | 22 | P1, P2 |
-| 02 Hurdle Step | 14 | 12 | 26 | P1, P3 |
-| 03 Inline Lunge | 14 | 12 | 26 | P1, P3 |
-| 04 Side Lunge | 14 | 12 | 26 | P2, P4 |
-| 05 Sit to Stand | 12 | 9 | 21 | P2, P5 |
-| 06 Standing Leg Raise | 12 | 12 | 24 | P3, P4 |
-| 07 Shoulder Abduction | 5 | 4 | 9 | P4 only |
-| 08 Shoulder Extension | 6 | 4 | 10 | P5 only |
-| 10 Shoulder Scaption | 6 | 4 | 10 | P5 only |
+3. **fine_tune_classifier.py** — Created and executed. Loaded `classifier.keras`, recompiled with Adam(lr=0.0001), trained on expanded dataset. EarlyStopping triggered at epoch 48/150.
+
+   | Metric | Before | After | Change |
+   |--------|--------|-------|--------|
+   | Val Exercise Accuracy | 97.15% | 96.66% | -0.49% |
+   | Val Quality Accuracy | 92.93% | 94.37% | +1.44% |
+
+4. **export_models.py** — Re-ran. `classifier.tflite` = 219 KB. Verified with dummy inference.
+
+5. **gui.py** — Fixed:
+   - Added `--model lite|full` CLI arg (default `lite` for RPi 5)
+   - Replaced `parse_args()` with `parse_known_args()` for test import compatibility
+   - Added `_prepare_frame_for_pose()` to downscale raw frames to 640x480 before BlazePose
+   - Camera switch also verifies and downscales
+
+6. **rpi_setup.sh** — Rewrote:
+   - mediapipe ARM64: builds from source (~30-40 min) with fallback instructions
+   - Installs system deps (python3-dev, gcc, mesa libs, pkg-config)
+   - Updated checklist comments
+
+7. **requirements.txt** — Split runtime (RPi) vs build-time (Mac/Colab) deps with comments
+
+8. **README.md** — Updated with:
+   - RPi 5 FPS benchmarks (Lite: 25-30, Full: 10-18)
+   - Camera resolution behavior explanation
+   - mediapipe ARM64 installation notes
+   - Quick start for Mac training flow
+   - Link to logs.md
+
+9. **logs.md** — Created with full training history: architecture, metrics, fine-tuning results, window distributions, environment info
+
+10. **eval/annotate_test_videos.py** — Fixed: added `ai-edge-litert` import fallback (was missing)
+
+11. **Tests:** 47/47 pass (`pytest tests/ -v`)
+
+12. **Test video annotation:** All 26 videos re-annotated with fine-tuned model (740 MB)
+
+### Files Created/Modified
+
+| File | Action |
+|------|--------|
+| `extract_test_keypoints.py` | **NEW** |
+| `fine_tune_classifier.py` | **NEW** |
+| `logs.md` | **NEW** |
+| `gui.py` | **UPDATED** — `--model` flag + camera downscale fix |
+| `rpi_setup.sh` | **UPDATED** — mediapipe ARM64 source build |
+| `requirements.txt` | **UPDATED** — runtime vs build-time split |
+| `README.md` | **UPDATED** — RPi instructions + FPS |
+| `eval/annotate_test_videos.py` | **UPDATED** — ai-edge-litert fallback |
+| `HANDOFF.md` | **UPDATED** — this file |
 
 ---
 
-## Model Performance
+## Session 2: Training + Test Annotation + RPi Planning
 
-### Random 80/20 Split (same people, held-out windows)
-| Split | Exercise Acc | Quality Acc |
-|-------|-------------|-------------|
-| Train | 90.0% | 87.9% |
-| Val | 88.3% | 86.3% |
+### Training Results
 
-### Person-Based Split (unseen people held out)
-| Split | Exercise Acc | Quality Acc | Meaning |
-|-------|-------------|-------------|---------|
-| Train (P1+P2+P3) | 98.6% | 84.4% | Memorized training subjects |
-| Val (P4) | 15.5% | 50.9% | Near random (11% is chance) |
-| Test (P5) | 10.2% | 66.8% | Near random (11% is chance) |
+Classifier trained with EarlyStopping (patience=10), aborted by epoch 45/150:
 
-### ⚠️ Critical Finding: Generalization Gap
+| Epoch | Train Loss | Train Ex Acc | Train Qu Acc | Val Loss | Val Ex Acc | Val Qu Acc |
+|-------|-----------|-------------|-------------|---------|-----------|-----------|
+| 1 | 1.1274 | 79.00% | 71.11% | 0.8204 | 86.93% | 76.45% |
+| 5 | 0.5043 | 93.48% | 84.65% | 0.4721 | 94.03% | 85.54% |
+| 10 | 0.3748 | 95.49% | 88.46% | 0.3679 | 95.68% | 88.63% |
+| 20 | 0.2852 | 96.65% | 91.28% | 0.3379 | 95.88% | 90.27% |
+| 30 | 0.2425 | 97.26% | 92.69% | 0.2755 | 96.98% | 91.91% |
+| 40 | 0.2162 | 97.59% | 93.56% | 0.2721 | 97.02% | 92.27% |
+| 45 | 0.2061 | 97.70% | 93.81% | 0.2607 | 97.15% | 92.93% |
 
-The model **cannot recognize exercises from unseen people**. With only 3 training people,
-there isn't enough body-type, movement-style, and camera-angle variation for the LSTM
-to learn exercise patterns that generalize. This is a **data diversity problem**, not a
-model architecture problem.
+**Final:** 97.15% val exercise, 92.81% val quality accuracy.
+Model saved to `models/classifier.keras`.
 
-### Fix Options
+### Export
 
-| Approach | Effort | Impact |
-|----------|--------|--------|
-| **20+ training people** | High (data collection) | Most impactful |
-| **Joint-angle features** | Medium (code changes) | Body-invariant but camera-angle dependent |
-| **3D pose estimation** | High (new model) | Full fix |
-| **Per-person normalization** | Low (code) | Tested — didn't help |
+`classifier.keras` → `classifier.tflite` (219 KB). Verified with dummy inference.
+Input: `(1, 30, 16)`, Outputs: `(1, 9)` exercise + `(1, 2)` quality.
+
+### Training Set Annotation (174 videos)
+
+All 174 training videos annotated with exercise + quality predictions (HUD overlay):
+
+```
+eval/results/train_annotated/
+  01_DeepSquat/       22 videos
+  02_HurdleStep/      26 videos
+  03_InlineLunge/     26 videos
+  04_SideLunge/       26 videos
+  05_SittoStand/      21 videos
+  06_StandingLegRaise/24 videos
+  07_ShoulderAbduction/ 9 videos
+  08_ShoulderExtension/ 10 videos
+  10_ShoulderScaption/  10 videos
+  summary.csv
+```
+
+Results: 100% exercise accuracy, 98.9% quality accuracy (172/174).
+
+### Test Set Annotation (26 unseen videos)
+
+Real-world test videos from `eval/TEST/` with different camera angles (frontal, lateral, 45-degree) and subjects not seen during training. Output:
+
+```
+eval/results/test_annotated/   (26 files, 743 MB)
+```
+
+### Model Observations
+
+- Exercise classification on training set: near perfect (100%). Likely overfit to training subjects/angles.
+- Test videos expose the generalization gap — some exercises get confused on unseen angles.
+- Quality classification is the harder task (92.8% val vs 97.2% ex).
+- BlazePose detects all 33 landmarks reliably (0 frame drops on test videos).
+
+### RPi 5 Deployment Assessment
+
+- **mediapipe** has NO official Linux ARM64 wheel — this is the primary blocker for RPi.
+- Everything else (TFLite, ONNX, OpenCV, Flask) has ARM64 wheels.
+- Pipeline is 100% CPU-based; no GPU code anywhere.
+- gui.py already requests 640x480 webcam, but BlazePose runs on raw frame before the resize — needs fix.
+- Configurable `model_complexity` needed: Lite (0) for RPi speed, Full (1) for desktop accuracy.
 
 ---
 
-## The 9 Classes
+## Decisions Made (Session 2)
 
-| Index | Exercise | ID | Training Videos |
-|-------|----------|----|-----------------|
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Fine-tuning strategy | Load `classifier.keras`, continue training with LR=0.0001 | Preserves learned weights, adapts to new data |
+| Test video quality labels | All assumed "correct" | Demo/reference videos, no incorrect examples |
+| RPi target | RPi 5, CPU-only | User's deployment hardware |
+| Default model for RPi | BlazePose Lite (`model_complexity=0`) | 20–30 FPS on RPi 5 vs 10–18 FPS with Full |
+| Desktop model | BlazePose Full (`model_complexity=1`) | Runs fine on M2 (~25–30 FPS) |
+| Model selection | `--model lite\|full` CLI flag | User can choose per deployment |
+| Webcam resolution | 640×480, but must verify driver honors `cap.set()` and downscale raw frame before BlazePose | Avoids running detector on accidental 1080p frames |
+| Classifier model | `models/classifier.tflite` (219 KB LSTM) | Negligible inference cost (~0.1ms) |
+| Training hardware | Mac (M2) only | TensorFlow training not for RPi |
+
+---
+
+## Next Session: Fine-Tune + RPi Setup + Push
+
+### 1. Fine-Tune Model with Test Videos
+
+**Goal:** Improve generalization to unseen camera angles and subjects.
+
+```bash
+# Step 1: Extract keypoints from test videos (26 files)
+# Step 2: Label by exercise (from filename mapping)
+# Step 3: Rebuild windows with expanded dataset
+source .venv/bin/activate
+python extract_test_keypoints.py          # new script
+python build_windows.py                   # now includes test data (~420k windows)
+
+# Step 4: Fine-tune (load weights, not restart)
+source .venv-tf/bin/activate
+python fine_tune_classifier.py            # new script: loads classifier.keras, LR=0.0001
+python export_models.py                   # → classifier.tflite
+
+# Step 5: Verify
+source .venv-tf/bin/activate
+python eval/annotate_test_videos.py       # re-annotate test set, compare before/after
+```
+
+**Filename → exercise ID mapping for test videos:**
+
+| Filename pattern | Exercise ID | Class |
+|-----------------|-------------|-------|
+| `DEEP SQUATS`, `Squat` | 01 | 0 (Deep Squat) |
+| `Hurdle Step` | 02 | 1 (Hurdle Step) |
+| `Inline Lunge`, `INLINE LUNGE` | 03 | 2 (Inline Lunge) |
+| `Side Lunge`, `SIDE LUNGES` | 04 | 3 (Side Lunge) |
+| `Sit to Stand` | 05 | 4 (Sit to Stand) |
+| `Standing leg raise`, `Leg Raises`, `STANDING LEG RAISE` | 06 | 5 (Standing Leg Raise) |
+| `SHOULDER ABDUCTION` | 07 | 6 (Shoulder Abduction) |
+| `SHOULDER EXTENSION` | 08 | 7 (Shoulder Extension) |
+| `SHOULDER SCAPTION` | 10 | 8 (Shoulder Scaption) |
+
+### 2. Fix RPi 5 Deployment
+
+**Steps:**
+
+- Fix `gui.py` — verify actual camera resolution, downscale raw frame BEFORE BlazePose if >640x480
+- Add `--model lite|full` CLI arg to `gui.py` (default `lite`)
+- Fix `rpi_setup.sh` — resolve `mediapipe` ARM64 installation (build from source or community wheel)
+- Update `requirements.txt` — clearly split runtime (RPi) vs build-time (Mac training) deps
+- Update `README.md` — RPi 5 setup instructions with expected FPS benchmarks
+- Push only necessary files to repo (no `.npy`, `.task`, `.mp4`, `.keras`, `.tflite`)
+
+**RPi 5 expected performance:**
+
+| Configuration | Resolution | FPS |
+|--------------|-----------|-----|
+| Full model (`model_complexity=1`) | 640×480 | 10–18 |
+| Lite model (`model_complexity=0`) | 640×480 | 25–30 |
+
+### 3. Repo Cleanup for Push
+
+Stage these files (NOT staged: `data/*.npy`, `models/*.task`, `models/*.keras`, `models/*.tflite`, `eval/results/`):
+
+```
+gui.py                          # --model flag + camera fix
+pose_estimator.py               # (existing, supports model_complexity)
+joint_map.py                    # (existing)
+joint_angles.py                 # (existing)
+train_classifier.py             # (existing)
+fine_tune_classifier.py         # NEW — fine-tuning script
+build_windows.py                # (existing)
+export_models.py                # (existing)
+extract_video_keypoints.py      # (existing)
+extract_test_keypoints.py       # NEW — test video keypoint extraction
+eval/annotate_video.py          # (existing)
+eval/annotate_all_train_videos.py # (existing)
+eval/annotate_test_videos.py    # (existing)
+rpi_setup.sh                    # UPDATED — mediapipe ARM64 fix
+requirements.txt                # UPDATED — runtime vs build-time split
+README.md                       # UPDATED — RPi instructions
+HANDOFF.md                      # UPDATED (this file)
+tests/                          # (existing, all 47 pass)
+session_chat/                   # (existing)
+tts_engine.py                   # (existing)
+session_logger.py               # (existing)
+preprocess_train_videos.py      # (existing)
+```
+
+### 4. Tests
+
+```bash
+source .venv/bin/activate       # or .venv-tf on RPi
+pytest tests/ -v                # 47 tests, must pass
+python gui.py --model lite      # smoke test
+```
+
+---
+
+## Environments (Unchanged)
+
+| Venv | Python | Purpose | Key Package |
+|------|--------|---------|-------------|
+| `.venv` | 3.14.5 (Homebrew) | Extraction, inference, GUI | `mediapipe` |
+| `.venv-tf` | 3.11.9 (Homebrew) | Training, export | `tensorflow` |
+
+If both `mediapipe` and `tensorflow`/`ai-edge-litert` are needed at inference time, use `.venv-tf` (it has both).
+
+---
+
+## Model Architecture (Unchanged)
+
+```
+Input: (30, 16)        # 30 time steps × 16 angle features (hip-centered)
+  LSTM(64, return_sequences=True)
+  LSTM(32)
+  Dense(64, ReLU) + Dropout(0.3)
+  ├─ exercise_out: Dense(9, softmax)
+  └─ quality_out: Dense(2, softmax)
+```
+
+Optimizer: Adam(lr=0.001), batch=32, max 150 epochs, EarlyStopping(patience=10).
+**Fine-tuning:** Adam(lr=0.0001), same architecture, loads pre-trained weights.
+
+---
+
+## The 9 Exercise Classes (Unchanged)
+
+| Index | Exercise | ID | Training Videos | Test Videos |
+|-------|----------|----|----------------|-------------|
+| 0 | Deep Squat | 01 | 22 | 2 |
+| 1 | Hurdle Step | 02 | 26 | 2 |
+| 2 | Inline Lunge | 03 | 26 | 2 |
+| 3 | Side Lunge | 04 | 26 | 8 |
+| 4 | Sit to Stand | 05 | 21 | 6 |
+| 5 | Standing Leg Raise | 06 | 24 | 2 |
+| 6 | Shoulder Abduction | 07 | 9 | 1 |
+| 7 | Shoulder Extension | 08 | 10 | 1 |
+| 8 | Shoulder Scaption | 10 | 10 | 1 |
+
+Note: Class 5 (Standing Leg Raise) includes "Leg Raises" from test set.
+"Leg Raises" is standing leg raise (06), not a separate exercise.
+
+---
+
+## Active Artifacts
+
+- `data/normalized/*.npy` — 174 keypoint files (will become 200 after test extraction)
+- `data/labels.csv` — 174 entries (will become 200)
+- `data/X_train.npy` — (374570, 30, 16) — will be rebuilt with test data
+- `models/classifier.keras` — best Keras model
+- `models/classifier.tflite` — TFLite for inference (219 KB)
+- `models/pose_landmarker_full.task` — BlazePose Full (9.4 MB)
+- `eval/results/train_annotated/` — 174 annotated training videos
+- `eval/results/test_annotated/` — 26 annotated test videos (743 MB)
+
+---
+
+## Session 1: MoveNet → MediaPipe BlazePose Migration
+
+**Status:** BlazePose migration done. Extraction + windows complete. Training pending.
+
+---
+
+## What Happened This Session
+
+Replaced MoveNet Thunder (TFLite) with MediaPipe BlazePose across the entire codebase. Created a DRY `pose_estimator.py` helper module to eliminate duplicated pose-estimation code across 5 files.
+
+### Code Changes
+
+| File | Action |
+|------|--------|
+| `pose_estimator.py` | **NEW** — BlazePose wrapper (Task API, auto-downloads model) |
+| `joint_map.py` | Replaced VICON_TO_MOVENET with BLAZEPOSE_MAPPED_INDICES, BLAZEPOSE_JOINT_NAMES |
+| `joint_angles.py` | Updated docstring (logic unchanged) |
+| `extract_video_keypoints.py` | Swap MoveNet TFLite → PoseEstimator |
+| `gui.py` | Swap MoveNet TFLite → PoseEstimator, draw_landmarks for 33-landmark skeleton |
+| `eval/annotate_video.py` | Same swap |
+| `eval/annotate_all_train_videos.py` | Same swap |
+| `eval/eval_cross_dataset.py` | Same swap |
+| `export_models.py` | Removed MoveNet download/verify, kept classifier→TFLite export |
+| `requirements.txt` | Added `mediapipe`, kept `ai-edge-litert` |
+| `rpi_setup.sh` | Removed MoveNet check, added `mediapipe` to pip install |
+| `tests/test_gui_integration.py` | Replaced TFLite mock with PoseEstimator mock |
+| `README.md` | Updated for BlazePose |
+
+### Key Design Decision
+
+Created `pose_estimator.py` instead of inline changes in each file. This wraps MediaPipe's 0.10.x Task API (`mediapipe.tasks.python.vision.PoseLandmarker`) and provides:
+- `process_frame(frame)` → list of 33 NormalizedLandmark, or None
+- `extract_mapped_joints(landmarks)` → (12, 2) float32 array (static)
+- `draw_landmarks(frame, landmarks)` → MediaPipe drawing utils
+- `count_visible(landmarks, threshold)` → int (static)
+
+### MediaPipe 0.10.x Note
+
+MediaPipe 0.10.x uses the **new Task API** (NOT the deprecated `mp.solutions.pose` API from 0.9.x). Requires a `.task` model file:
+- Downloaded: `models/pose_landmarker_full.task` (~9.4 MB) for `model_complexity=1`
+- Lite (`model_complexity=0`) and Heavy (`model_complexity=2`) URLs configured but not downloaded
+
+### Pipeline Progress
+
+```
+  preprocess_train_videos.py → DONE (prior session)
+  extract_video_keypoints.py → DONE (172/174 videos, ~40 min)
+  build_windows.py           → DONE (374,570 windows)
+  train_classifier.py        → PENDING (aborted at epoch 8/150)
+  export_models.py           → PENDING
+  gui.py                     → PENDING (smoke test)
+```
+
+### Extraction Results
+- 172 new videos processed, 2 skipped (already had .npy)
+- Output: `data/normalized/<stem>.npy` — shape `(F, 12, 2)`
+- Labels: `data/labels.csv` — 174 entries
+- All 9 exercise classes present (IDs 1-8, 10; no 9 — expected)
+
+### Window Building Results
+- 374,570 windows from 174 videos
+- Exercise distribution: Class 0: 52,565 / Class 1: 62,845 / Class 2: 52,580 / Class 3: 45,990 / Class 4: 43,145 / Class 5: 41,955 / Class 6: 18,995 / Class 7: 24,815 / Class 8: 31,680
+- Quality: correct=200,230 / incorrect=174,340
+- Output: `data/X_train.npy` (374570, 30, 16), `data/y_exercise.npy`, `data/y_quality.npy`
+
+### Training (Partial — ABORTED)
+
+Aborted at epoch 8/150. Last checkpoint deleted. Results so far were promising:
+
+| Epoch | Train Loss | Train Ex Acc | Train Qu Acc | Val Loss | Val Ex Acc | Val Qu Acc |
+|-------|-----------|-------------|-------------|---------|-----------|-----------|
+| 1 | 1.1328 | 79.40% | 70.23% | 0.8510 | 86.32% | 76.18% |
+| 2 | 0.7572 | 88.86% | 77.88% | 0.6194 | 91.83% | 81.29% |
+| 3 | 0.6473 | 91.10% | 80.82% | 0.5876 | 91.92% | 82.24% |
+| 4 | 0.5613 | 92.61% | 83.01% | 0.5076 | 93.65% | 83.61% |
+| 5 | 0.5112 | 93.49% | 84.36% | 0.5171 | 93.91% | 84.34% |
+| 6 | 0.4695 | 94.20% | 85.49% | 0.4607 | 94.68% | 84.47% |
+| 7 | 0.4399 | 94.62% | 86.31% | 0.4206 | 94.87% | 86.69% |
+| 8 | 0.4178 | 94.97% | 86.92% | 0.4089 | 94.96% | 87.41% |
+
+### Tests
+All 47 tests pass (`pytest tests/ -v`).
+
+---
+
+## Next Session: Complete Training + Export + Verify
+
+### 1. Train Classifier
+```bash
+# Python 3.11 venv (TensorFlow doesn't support 3.14 yet)
+source .venv-tf/bin/activate
+python -u train_classifier.py
+```
+- Already have `X_train.npy`, `y_exercise.npy`, `y_quality.npy` ready
+- ~1 min per epoch on M2, 150 max epochs with EarlyStopping(patience=10)
+- Expect ~30-40 epochs before early stop
+- Best model saved at `models/classifier_best.keras`
+
+### 2. Export to TFLite
+```bash
+source .venv-tf/bin/activate
+python export_models.py
+```
+- Converts `classifier.keras` → `classifier.tflite`
+- Verifies with dummy inference
+
+### 3. Verify
+```bash
+source .venv/bin/activate        # Python 3.14 for mediapipe
+pytest tests/ -v
+python gui.py                     # smoke test on Mac
+```
+
+---
+
+## Environments
+
+| Venv | Python | Purpose | Key Package |
+|------|--------|---------|-------------|
+| `.venv` | 3.14.5 (Homebrew) | Extraction, inference, GUI | `mediapipe` |
+| `.venv-tf` | 3.11.9 (Homebrew) | Training, export | `tensorflow` |
+
+**NOTE:** `.venv`'s `python` symlink was fixed (was pointing to pyenv's 3.11.9, now → homebrew 3.14.5).
+
+### Active Artifacts
+- `data/normalized/*.npy` — 174 keypoint files (shape `(F, 12, 2)`)
+- `data/labels.csv` — 174 entries
+- `data/X_train.npy` — (374570, 30, 16)
+- `data/y_exercise.npy` — (374570,)
+- `data/y_quality.npy` — (374570,)
+- `models/pose_landmarker_full.task` — BlazePose model (9.4 MB)
+
+---
+
+## Model Architecture (Unchanged)
+
+```
+Input: (30, 16)        # 30 time steps × 16 angle features
+  LSTM(64, return_sequences=True)
+  LSTM(32)
+  Dense(64, ReLU) + Dropout(0.3)
+  ├─ exercise_out: Dense(9, softmax)
+  └─ quality_out: Dense(2, softmax)
+```
+
+Optimizer: Adam(lr=0.001), batch=32, max 150 epochs, EarlyStopping(patience=10).
+
+---
+
+## The 9 Exercise Classes (Unchanged)
+
+| Index | Exercise | ID | Videos |
+|-------|----------|----|--------|
 | 0 | Deep Squat | 01 | 22 |
 | 1 | Hurdle Step | 02 | 26 |
 | 2 | Inline Lunge | 03 | 26 |
@@ -97,88 +468,6 @@ model architecture problem.
 | 7 | Shoulder Extension | 08 | 10 |
 | 8 | Shoulder Scaption | 10 | 10 |
 
-**Note:** Exercise 09 (Shoulder Rotation) dropped — no video available.
-
 ---
 
-## Artifacts
-
-| Artifact | Location | Size | Purpose |
-|----------|----------|------|---------|
-| `classifier.keras` | `models/` | 504 KB | Final trained model (gitignored) |
-| `classifier.tflite` | `models/` | 221 KB | TFLite for RPi5 deployment (tracked) |
-| `X_train.npy` | `data/` | 1.3 GB | 451K × 30 × 24 windows (gitignored) |
-
----
-
-## Repo State
-
-### Tracked (on remote)
-```
-.gitignore, README.md, requirements.txt, rpi_setup.sh
-gui.py, joint_map.py, tts_engine.py, session_logger.py
-session_chat/ (5 files)
-models/classifier.tflite, models/movenet_thunder_int8.tflite
-tests/ (6 files)
-HANDOFF.md, RETRAIN_PROGRESS.md
-```
-
-### Gitignored (not tracked)
-```
-data/ — training data, knowledge base, embeddings
-eval/ — evaluation scripts, raw/test videos
-data_collection/, references/ — checklists, PDFs
-models/*.keras — intermediate build artifacts
-logs/, .venv/, __pycache__/
-build_*.py, extract_*.py, train_*.py, load_*.py — build-only scripts
-```
-
-### RPi Deployment Checklist
-- [x] `git pull` gets all tracked files
-- [x] `bash rpi_setup.sh` installs all deps
-- [x] `models/classifier.tflite` is the 174-video, 9-class model
-- [x] Knowledge base copied via `scp` (data/knowledge_base.json + data/embedding_model/)
-- [x] `GROQ_API_KEY` set in `.env`
-
----
-
-## Running the Pipeline (Quick Reference)
-
-```bash
-source .venv/bin/activate
-
-# Preprocess new videos (if adding more data)
-python3 preprocess_train_videos.py
-
-# Extract keypoints (~30 min for 174 videos)
-python3 extract_video_keypoints.py --video_dir eval/train_videos_flat
-
-# Build training windows
-python3 build_windows.py
-
-# Train model (~30-60 min on M2)
-python3 train_classifier.py
-
-# Export TFLite
-python3 export_models.py
-
-# Run tests
-python3 -m pytest tests/ -v --ignore=tests/test_app.py --ignore=tests/test_llm.py
-```
-
-## Tests
-
-```
-tests/test_gui_integration.py ..... 7/7
-tests/test_retrieval.py ............ 5/5
-tests/test_session_logger.py ...... 8/8
-tests/test_tts_engine.py .......... 8/8
-                                      28/28
-```
-
-Note: `test_app.py` and `test_llm.py` require `groq` — install with `pip install groq`.
-
----
-
-*End of handoff. The model is deployed and runs on RPi5. Generalization to unseen
-people is still the open problem.*
+*End of handoff. Extraction + windows ready. Re-run training next session.*

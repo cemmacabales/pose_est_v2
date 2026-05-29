@@ -7,49 +7,41 @@ FAKE_SESSION = {"frames": [], "summary": "test"}
 
 
 def _make_interpreter_mock():
-    """Return a mock Interpreter class that creates properly configured instances."""
-    instances = []
+    """Return a mock Interpreter class for the classifier."""
+    mock_inst = MagicMock()
+    mock_inst.get_input_details.return_value = [{"index": 0, "shape": [1, 30, 16]}]
+    mock_inst.get_output_details.return_value = [
+        {"index": 1, "shape": [1, 9]},
+        {"index": 2, "shape": [1, 2]},
+    ]
 
-    def _init(*args, **kwargs):
-        inst = MagicMock()
-        instances.append(inst)
+    def _get_tensor(idx):
+        if idx == 1:
+            out = np.zeros((1, 9), dtype=np.float32)
+            out[0, 0] = 0.9
+            return out
+        elif idx == 2:
+            out = np.zeros((1, 2), dtype=np.float32)
+            out[0, 1] = 0.9
+            return out
+        return np.zeros((1, 9), dtype=np.float32)
 
-        if len(instances) == 1:
-            # MoveNet
-            inst.get_input_details.return_value = [{"index": 0, "shape": [1, 256, 256, 3]}]
-            inst.get_output_details.return_value = [{"index": 0, "shape": [1, 1, 17, 3]}]
+    mock_inst.get_tensor.side_effect = _get_tensor
+    return MagicMock(return_value=mock_inst)
 
-            def _get_tensor(idx):
-                kps = np.zeros((1, 1, 17, 3), dtype=np.float32)
-                kps[0, 0, :, 2] = 0.9
-                return kps
 
-            inst.get_tensor.side_effect = _get_tensor
-        else:
-            # Classifier
-            inst.get_input_details.return_value = [{"index": 0, "shape": [1, 30, 24]}]
-            inst.get_output_details.return_value = [
-                {"index": 1, "shape": [1, 9]},
-                {"index": 2, "shape": [1, 2]},
-            ]
+def _make_pose_estimator_mock():
+    """Return a mock PoseEstimator class with fake BlazePose behavior."""
+    mock_inst = MagicMock()
+    mock_inst.process_frame.return_value = MagicMock()
+    mock_inst.draw_landmarks = MagicMock()
 
-            def _get_tensor(idx):
-                if idx == 1:
-                    out = np.zeros((1, 9), dtype=np.float32)
-                    out[0, 0] = 0.9
-                    return out
-                elif idx == 2:
-                    out = np.zeros((1, 2), dtype=np.float32)
-                    out[0, 1] = 0.9
-                    return out
-                return np.zeros((1, 9), dtype=np.float32)
-
-            inst.get_tensor.side_effect = _get_tensor
-
-        return inst
-
-    mock_cls = MagicMock(side_effect=_init)
-    return mock_cls
+    mock_cls = MagicMock(return_value=mock_inst)
+    mock_cls.count_visible = MagicMock(return_value=33)
+    mock_cls.extract_mapped_joints = MagicMock(
+        return_value=np.zeros((12, 2), dtype=np.float32)
+    )
+    return mock_cls, mock_inst
 
 
 @pytest.fixture
@@ -58,7 +50,6 @@ def gui_mod():
     if "gui" in sys.modules:
         del sys.modules["gui"]
 
-    # Mocks for externally-imported classes/functions
     mock_tts_class = MagicMock()
     mock_tts_instance = MagicMock()
     mock_tts_class.return_value = mock_tts_instance
@@ -78,8 +69,8 @@ def gui_mod():
     mock_cap.read.return_value = (True, fake_frame)
 
     mock_interpreter = _make_interpreter_mock()
+    mock_pose_estimator_cls, mock_pose_estimator_inst = _make_pose_estimator_mock()
 
-    # Build mock cv2 module manually so we never import the real (broken) cv2
     mock_cv2 = MagicMock()
     mock_cv2.VideoCapture.return_value = mock_cap
     mock_cv2.resize.side_effect = lambda img, size: np.zeros((size[1], size[0], 3), dtype=np.uint8)
@@ -89,7 +80,6 @@ def gui_mod():
     mock_cv2.CAP_PROP_BUFFERSIZE = 1
     mock_cv2.COLOR_BGR2RGB = 4
 
-    # Build mock tkinter module
     mock_tk = MagicMock()
     mock_tk.Tk.return_value = MagicMock()
     mock_tk.Frame.return_value = MagicMock()
@@ -97,7 +87,6 @@ def gui_mod():
     mock_tk.Button.return_value = MagicMock()
     mock_tk.Canvas.return_value = MagicMock()
 
-    # Build mock PIL modules
     mock_pil_image = MagicMock()
     mock_pil_image.fromarray.return_value = MagicMock()
     mock_pil_imagetk = MagicMock()
@@ -106,11 +95,13 @@ def gui_mod():
     mock_pil.Image = mock_pil_image
     mock_pil.ImageTk = mock_pil_imagetk
 
-    # Build mock tflite / litert interpreter modules
     mock_tflite_interp = MagicMock()
     mock_tflite_interp.Interpreter = mock_interpreter
     mock_litert_interp = MagicMock()
     mock_litert_interp.Interpreter = mock_interpreter
+
+    mock_pose_estimator_module = MagicMock()
+    mock_pose_estimator_module.PoseEstimator = mock_pose_estimator_cls
 
     extra_modules = {
         "tts_engine": MagicMock(),
@@ -128,6 +119,7 @@ def gui_mod():
         "tflite_runtime.interpreter": mock_tflite_interp,
         "ai_edge_litert": MagicMock(),
         "ai_edge_litert.interpreter": mock_litert_interp,
+        "pose_estimator": mock_pose_estimator_module,
     }
     extra_modules["tts_engine"].TTSEngine = mock_tts_class
     extra_modules["session_logger"].SessionLogger = mock_logger_class
@@ -136,7 +128,6 @@ def gui_mod():
     with patch.dict(sys.modules, extra_modules):
         import gui
 
-        # Expose key mocks for test assertions
         gui._test_mocks = {
             "tts_class": mock_tts_class,
             "tts_instance": mock_tts_instance,
@@ -145,6 +136,8 @@ def gui_mod():
             "start_server": mock_start_server,
             "qrcode": mock_qrcode,
             "qr_img": mock_qr_img,
+            "pose_estimator_cls": mock_pose_estimator_cls,
+            "pose_estimator_inst": mock_pose_estimator_inst,
         }
         yield gui
 
@@ -153,17 +146,14 @@ def gui_mod():
 
 
 def test_tts_initialized_on_startup(gui_mod):
-    """TTSEngine should be instantiated and announce_session_start called once on import."""
     gui_mod._test_mocks["tts_instance"].announce_session_start.assert_called_once()
 
 
 def test_logger_initialized_on_startup(gui_mod):
-    """SessionLogger should be instantiated once on import."""
     assert gui_mod._test_mocks["logger_class"].call_count == 1
 
 
 def _run_one_inference_iteration(gui_mod):
-    """Pre-fill rolling buffers and trigger one update() so smoothing fires."""
     dummy_frame = np.zeros((12, 2), dtype=np.float32)
     for _ in range(30):
         gui_mod.frame_buffer.append(dummy_frame)
@@ -180,13 +170,11 @@ def _run_one_inference_iteration(gui_mod):
 
 
 def test_inference_loop_calls_tts_update(gui_mod):
-    """tts.update should be called with the expected exercise name, quality, and a timestamp."""
     _run_one_inference_iteration(gui_mod)
     gui_mod.tts.update.assert_called_once_with("Deep Squat", 1, ANY)
 
 
 def test_inference_loop_calls_logger_log_frame(gui_mod):
-    """logger.log_frame should be called with the expected indices and confidence."""
     _run_one_inference_iteration(gui_mod)
     gui_mod.logger.log_frame.assert_called_once()
     args = gui_mod.logger.log_frame.call_args[0]
@@ -196,19 +184,16 @@ def test_inference_loop_calls_logger_log_frame(gui_mod):
 
 
 def test_end_session_calls_logger_end_session(gui_mod):
-    """_end_session should call logger.end_session exactly once."""
     gui_mod._end_session()
     gui_mod.logger.end_session.assert_called_once()
 
 
 def test_end_session_calls_start_server(gui_mod):
-    """_end_session should call start_server with the session data returned by logger."""
     gui_mod._end_session()
     gui_mod.start_server.assert_called_once_with(FAKE_SESSION)
 
 
 def test_end_session_displays_qr_code(gui_mod):
-    """_end_session should generate a QR code for the review URL."""
     gui_mod._end_session()
     gui_mod.qrcode.make.assert_called_once()
     url_passed = gui_mod.qrcode.make.call_args[0][0]

@@ -1,3 +1,4 @@
+# ── Runtime deps (RPi 5 + Mac) ──
 ai-edge-litert
 opencv-python
 numpy
@@ -9,13 +10,23 @@ flask
 python-dotenv
 pytest
 
-# ── RAG / LLM runtime deps (needed on RPi 5) ──
+# ── RAG / LLM runtime deps ──
 groq
 onnxruntime
 tokenizers
 
-# ── Build-time deps (run build_knowledge_base.py on Mac/Colab, NOT RPi) ──
-pymupdf
-sentence-transformers
-torch
-transformers
+# ── Pose estimation (runtime) ──
+# NOTE: mediapipe has NO official Linux ARM64 wheel.
+# On RPi 5: rpi_setup.sh builds from source (see script for alternatives).
+# On Mac: installs normally via pip.
+mediapipe
+
+# ── Build-time only (Mac/Colab — NOT RPi 5) ──
+# Uncomment below on Mac/Colab for knowledge base building:
+# pymupdf
+# sentence-transformers
+# torch
+# transformers
+#
+# TensorFlow training (Mac only — use .venv-tf with Python 3.11):
+#   pip install tensorflow

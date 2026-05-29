@@ -6,6 +6,7 @@ __pycache__/
 *.env
 venv/
 .venv/
+.venv-tf/
 env/
 ENV/
 
@@ -13,13 +14,16 @@ ENV/
 logs/
 /tmp/*.mp3
 
-# ── Data / Datasets (too large, built externally) ──
+# ── Data / Datasets (too large, generated locally) ──
 data/
 UI-PRMD/
 Penn_Action/
 
-# ── Training input videos ──
-eval/
+# ── Eval: scripts tracked, media data ignored ──
+eval/TEST/
+eval/results/
+eval/train_videos_flat/
+!eval/*.py
 trained_videos/
 
 # ── Data collection checklists ──
@@ -28,19 +32,9 @@ data_collection/
 # ── Source PDF references (knowledge base is pre-built) ──
 references/
 
-# ── Intermediate model artifacts (RPi only needs .tflite) ──
+# ── Large model artifacts (.task is auto-downloaded) ──
 models/*.keras
-
-# ── Training / build scripts (not needed on RPi) ──
-train_classifier.py
-export_models.py
-build_windows.py
-build_knowledge_base.py
-extract_video_keypoints.py
-preprocess_train_videos.py
-load_dataset.py
-normalize_joints.py
-check_deps.py
+models/*.task
 
 # ── Data collection checklist (internal team doc) ──
 DATA_COLLECTION_CHECKLIST.md
@@ -52,5 +46,6 @@ smoke_test_qr.png
 # ── System / IDE ──
 .DS_Store
 .python-version
+.pytest_cache/
 .zshrc
 .bashrc
