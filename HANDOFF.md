@@ -1,68 +1,122 @@
-# Handoff Document — Session: Fine-Tuning Complete + RPi Deployment Ready
+# Handoff Document — Session: RPi 5 Live Deployment (blockers identified, fix plan ready)
 
 **Date:** 2026-05-29
-**Status:** Fine-tuning done. Export done. All RPi deployment fixes applied. 47 tests pass. Ready to push.
+**Status:** Fine-tuning + export done. Code pushed to GitHub. RPi 5 partially working — 2 runtime bugs remain with fixes planned. TTS audio device detection needs rewrite.
 
 ---
 
-## Session 3: Fine-Tuning + RPi Deployment Fixes
+## Session 4: RPi 5 Live Deployment
 
-### Completed Tasks
+### What Worked
 
-1. **extract_test_keypoints.py** — Created and executed. Extracted keypoints from 26 test videos, mapped filenames to exercise IDs using case-insensitive substring matching (per handoff mapping table). All test videos labeled as `correct` quality. Output: 26 `.npy` files in `data/normalized/`, `data/labels.csv` now has 200 entries.
+1. **Git clone + venv setup** — Success. Using Homebrew Python 3.11.15 (system Python is 3.13.5 which lacks mediapipe wheel).
 
-2. **build_windows.py** — Re-ran with expanded dataset. Result: **485,485 windows** (up from 374,570), ~111K new windows from test videos.
+2. **mediapipe installed** — `pip install mediapipe` worked from inside Python 3.11 venv. Version: **0.10.18**.
 
-3. **fine_tune_classifier.py** — Created and executed. Loaded `classifier.keras`, recompiled with Adam(lr=0.0001), trained on expanded dataset. EarlyStopping triggered at epoch 48/150.
+3. **All pip deps installed** — `ai-edge-litert`, `opencv-python`, `numpy`, `flask`, etc. all OK.
 
-   | Metric | Before | After | Change |
-   |--------|--------|-------|--------|
-   | Val Exercise Accuracy | 97.15% | 96.66% | -0.49% |
-   | Val Quality Accuracy | 92.93% | 94.37% | +1.44% |
+4. **classifier.tflite loaded** — TFLite inference works via `ai-edge-litert`.
 
-4. **export_models.py** — Re-ran. `classifier.tflite` = 219 KB. Verified with dummy inference.
+5. **Camera detected** — `/dev/video0` (USB webcam). GUI opens the Tkinter window.
 
-5. **gui.py** — Fixed:
-   - Added `--model lite|full` CLI arg (default `lite` for RPi 5)
-   - Replaced `parse_args()` with `parse_known_args()` for test import compatibility
-   - Added `_prepare_frame_for_pose()` to downscale raw frames to 640x480 before BlazePose
-   - Camera switch also verifies and downscales
+6. **Pose estimation runs** — BlazePose detects 33 landmarks and classifies exercises.
 
-6. **rpi_setup.sh** — Rewrote:
-   - mediapipe ARM64: builds from source (~30-40 min) with fallback instructions
-   - Installs system deps (python3-dev, gcc, mesa libs, pkg-config)
-   - Updated checklist comments
+7. **Tests pass** — 47/47 (`pytest tests/ -v`).
 
-7. **requirements.txt** — Split runtime (RPi) vs build-time (Mac/Colab) deps with comments
+8. **Push** — Committed and pushed to GitHub (`e9c3cd7`).
 
-8. **README.md** — Updated with:
-   - RPi 5 FPS benchmarks (Lite: 25-30, Full: 10-18)
-   - Camera resolution behavior explanation
-   - mediapipe ARM64 installation notes
-   - Quick start for Mac training flow
-   - Link to logs.md
+### What's Broken (2 Runtime Errors)
 
-9. **logs.md** — Created with full training history: architecture, metrics, fine-tuning results, window distributions, environment info
+#### Bug 1: `drawing_utils` crash in `pose_estimator.py:90`
 
-10. **eval/annotate_test_videos.py** — Fixed: added `ai-edge-litert` import fallback (was missing)
+```
+AttributeError: module 'mediapipe.tasks.python.vision' has no attribute 'drawing_utils'
+```
 
-11. **Tests:** 47/47 pass (`pytest tests/ -v`)
+**Root cause:** The RPi-installed mediapipe wheel (0.10.18) is a minimal build that includes the `tasks` API for inference but **omits the `solutions` submodule and `drawing_utils`**. On Mac this module exists, on the community ARM64 wheel it doesn't.
 
-12. **Test video annotation:** All 26 videos re-annotated with fine-tuned model (740 MB)
+**Fix plan for next session:** Replace `vision.drawing_utils.draw_landmarks()` with a **pure OpenCV fallback** in `pose_estimator.py.draw_landmarks()`:
+```python
+def draw_landmarks(self, frame, landmarks):
+    if landmarks is None: return
+    try:
+        vision.drawing_utils.draw_landmarks(...)
+    except (AttributeError, ImportError):
+        self._draw_landmarks_opencv(frame, landmarks)
+```
 
-### Files Created/Modified
+The OpenCV fallback draws 33 circles (`cv2.circle`) for landmarks + lines (`cv2.line`) for the MediaPipe skeleton connections (face, arms, torso, legs). Same visual output, zero dependency on mediapipe's drawing module.
 
-| File | Action |
-|------|--------|
-| `extract_test_keypoints.py` | **NEW** |
-| `fine_tune_classifier.py` | **NEW** |
-| `logs.md` | **NEW** |
-| `gui.py` | **UPDATED** — `--model` flag + camera downscale fix |
-| `rpi_setup.sh` | **UPDATED** — mediapipe ARM64 source build |
-| `requirements.txt` | **UPDATED** — runtime vs build-time split |
-| `README.md` | **UPDATED** — RPi instructions + FPS |
-| `eval/annotate_test_videos.py` | **UPDATED** — ai-edge-litert fallback |
-| `HANDOFF.md` | **UPDATED** — this file |
+#### Bug 2: TTS ALSA audio error 524
+
+```
+aplay: main:850: audio open error: Unknown error 524
+[TTS] ALSA device: hw:0,0
+```
+
+**Root cause:** `tts_engine.py._probe_alsa()` uses `aplay -l` which returns raw hardware IDs like `hw:0,0`. On the RPi 5, this maps to `vc4-hdmi-0` (HDMI audio) which is not active (no HDMI monitor with speakers connected). Also, Bluetooth speaker is connected but invisible to ALSA hardware probing (`aplay -l` doesn't detect Bluetooth devices).
+
+**Actual audio landscape on RPi 5:**
+```
+card 0: vc4hdmi0    — HDMI audio (not active, error 524)
+card 1: vc4hdmi1    — HDMI audio (not active)
+Bluetooth speaker   — connected but not detected (no PulseAudio, no pactl)
+```
+
+**Fix plan for next session:**
+1. Rewrite `_probe_alsa()` to use `aplay -L` (PCM name listing) instead of `aplay -l` (hardware listing). Return `sysdefault` or `default` — these route through ALSA's software mixer and handle any active audio output.
+2. In `_speak_fallback()`: try `aplay -D <device>` first, then `aplay` without `-D`, then `espeak` raw.
+3. If all audio fails: print `[TTS] Warning: no audio output available` and skip gracefully (no crash).
+
+### RPi 5 Environment
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| Python | 3.11.15 (Homebrew) | System Python 3.13.5 also exists but lacks mediapipe wheel |
+| mediapipe | 0.10.18 (wheel) | Installed via pip in venv, but minimal build (no drawing_utils) |
+| tkinter | Working | Installed via `brew install python-tk@3.11` |
+| Camera | `/dev/video0` | USB webcam |
+| Audio | HDMI only (`aplay -l`) | Bluetooth speaker connected but needs PulseAudio |
+| PulseAudio | NOT installed | `pactl` not found — need `apt-get install pulseaudio pulseaudio-module-bluetooth` |
+| classifier.tflite | 219 KB | TFLite inference OK |
+| espeak | Installed | TTS fallback available |
+
+### RPi 5 setup commands (what worked)
+
+```bash
+# System deps
+sudo apt-get install -y espeak python3-venv tk-dev tcl-dev
+
+# Homebrew Python 3.11 + tkinter
+brew install python@3.11
+brew install python-tk@3.11
+
+# Venv + deps
+/home/linuxbrew/.linuxbrew/bin/python3.11 -m venv .venv
+source .venv/bin/activate
+pip install mediapipe ai-edge-litert opencv-python numpy Pillow \
+    gtts "playsound==1.2.2" "qrcode[pil]" flask python-dotenv pytest \
+    groq onnxruntime tokenizers
+
+# Test
+python gui.py --model lite
+# → Tkinter window opens, camera shows, pose detected
+# → CRASH on draw_landmarks (Bug 1)
+# → TTS error 524 on aplay (Bug 2)
+```
+
+### Next Session: Fix 2 Bugs + RPi Audio
+
+1. **Fix `pose_estimator.py.draw_landmarks()`** — try/except + OpenCV fallback
+2. **Fix `tts_engine.py._probe_alsa()`** — use `aplay -L` instead of `aplay -l`, return `sysdefault`
+3. **Optionally install PulseAudio** for Bluetooth speaker support:
+   ```bash
+   sudo apt-get install -y pulseaudio pulseaudio-module-bluetooth
+   ```
+4. **Update `rpi_setup.sh`** — remove mediapipe source build (dead code), add `pip install mediapipe`, add PulseAudio step
+5. **Push fixes** to GitHub
+
+---
 
 ---
 

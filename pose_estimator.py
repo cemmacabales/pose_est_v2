@@ -82,17 +82,46 @@ class PoseEstimator:
             joints[i, 1] = landmarks[idx].y - hip_mid_y
         return joints
 
+    POSE_CONNECTIONS = [
+        (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8),
+        (9, 10), (11, 12), (11, 13), (13, 15), (15, 17), (15, 19), (15, 21),
+        (17, 19), (12, 14), (14, 16), (16, 18), (16, 20), (16, 22), (18, 20),
+        (11, 23), (12, 24), (23, 24), (23, 25), (24, 26), (25, 27), (26, 28),
+        (27, 29), (28, 30), (29, 31), (30, 32), (27, 31), (28, 32),
+    ]
+
+    LANDMARK_COLOR = (0, 255, 0)
+    CONNECTION_COLOR = (0, 255, 0)
+    LANDMARK_RADIUS = 3
+    LANDMARK_THICKNESS = -1
+    LINE_THICKNESS = 2
+
+    def _draw_landmarks_opencv(self, frame, landmarks):
+        h, w = frame.shape[:2]
+        points = [(int(lm.x * w), int(lm.y * h)) for lm in landmarks]
+        for px, py in points:
+            cv2.circle(frame, (px, py), self.LANDMARK_RADIUS,
+                       self.LANDMARK_COLOR, self.LANDMARK_THICKNESS)
+        for i0, i1 in self.POSE_CONNECTIONS:
+            if i0 < len(points) and i1 < len(points):
+                cv2.line(frame, points[i0], points[i1],
+                         self.CONNECTION_COLOR, self.LINE_THICKNESS)
+
     def draw_landmarks(self, frame, landmarks):
         """Draw 33-landmark BlazePose skeleton on BGR frame (mutates in place).
-        No-op if landmarks is None."""
+        No-op if landmarks is None. Falls back to OpenCV if mediapipe's
+        drawing_utils is not available (e.g. minimal ARM64 wheel)."""
         if landmarks is None:
             return
-        vision.drawing_utils.draw_landmarks(
-            frame,
-            landmarks,
-            connections=vision.PoseLandmarksConnections.POSE_LANDMARKS,
-            landmark_drawing_spec=vision.drawing_styles.get_default_pose_landmarks_style(),
-        )
+        try:
+            vision.drawing_utils.draw_landmarks(
+                frame,
+                landmarks,
+                connections=vision.PoseLandmarksConnections.POSE_LANDMARKS,
+                landmark_drawing_spec=vision.drawing_styles.get_default_pose_landmarks_style(),
+            )
+        except (AttributeError, ImportError):
+            self._draw_landmarks_opencv(frame, landmarks)
 
     @staticmethod
     def count_visible(landmarks, threshold=0.5):

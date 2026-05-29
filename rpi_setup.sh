@@ -7,6 +7,7 @@
 #
 # [ ] No pip install errors
 # [ ] espeak works: espeak "test" (hear audio)
+# [ ] pactl list short sinks (shows audio outputs)
 # [ ] python -c "import mediapipe" — no error
 # [ ] python -c "import gtts" — no error
 # [ ] python -c "import flask" — no error
@@ -60,70 +61,33 @@ echo ""
 echo "--- Installing mediapipe (runtime) ---"
 echo ""
 
-# mediapipe has no official Linux ARM64 wheel for RPi 5.
-# We attempt to build from source. This takes ~30-40 minutes.
-# If a pre-built community wheel is available, it will be auto-detected.
-#
-# The build requires:
-#   - Python development headers
-#   - OpenGL ES / EGL development packages
-#   - Mesa / libEGL / libGLESv2
-#   - Compiler toolchain (gcc, g++, make)
-
+# mediapipe now ships an ARM64 wheel for RPi 5 via pip.
 if python -c "import mediapipe" 2>/dev/null; then
-    echo "mediapipe already installed. Skipping build."
+    echo "mediapipe already installed. Skipping."
 else
-    echo "mediapipe not found. Install system build dependencies..."
-    sudo apt-get update -qq
-    sudo apt-get install -y -qq \
-        python3-dev \
-        gcc g++ make \
-        libgl1-mesa-dev \
-        libgles2-mesa-dev \
-        libegl1-mesa-dev \
-        pkg-config \
-        || true
+    pip install mediapipe
+fi
 
+echo ""
+echo "--- Installing PulseAudio for Bluetooth speaker support ---"
+echo ""
+
+if ! command -v pactl &>/dev/null; then
+    echo "PulseAudio not found. Installing..."
+    sudo apt-get install -y -qq pulseaudio pulseaudio-module-bluetooth 2>/dev/null || true
     echo ""
-    echo "Attempting to install mediapipe from source..."
-    echo "This may take 30-40 minutes on RPi 5."
+    echo "After reboot, pair your Bluetooth speaker with:"
+    echo "  bluetoothctl"
+    echo "  scan on"
+    echo "  pair <MAC>"
+    echo "  connect <MAC>"
+    echo "  trust <MAC>"
+    echo "Then select it as default sink:"
+    echo "  pactl list short sinks"
+    echo "  pactl set-default-sink <sink_name>"
     echo ""
-
-    mkdir -p /tmp/mediapipe_build
-    cd /tmp/mediapipe_build
-
-    if [ ! -d "mediapipe" ]; then
-        git clone --depth 1 --branch v0.10.14 \
-            https://github.com/google-ai-edge/mediapipe.git 2>/dev/null || \
-        git clone --depth 1 \
-            https://github.com/google-ai-edge/mediapipe.git
-    fi
-
-    cd mediapipe
-
-    pip install wheel setuptools -q
-
-    if ! pip install . --no-build-isolation 2>/dev/null; then
-        echo ""
-        echo "============================================"
-        echo "  WARNING: mediapipe source build failed."
-        echo "============================================"
-        echo ""
-        echo "This is expected — mediapipe has no official ARM64 wheel."
-        echo ""
-        echo "ALTERNATIVES:"
-        echo "  1. Try a community wheel (search pip for mediapipe ARM64)"
-        echo "  2. Use BlazePose via OpenCV's cv2.dnn module instead"
-        echo "  3. Offload pose estimation to cloud/edge TPU"
-        echo ""
-        echo "Pose estimation GUI will NOT work without mediapipe."
-        echo "All other components (training, data processing) run on Mac."
-        echo ""
-    else
-        echo "mediapipe installed successfully from source."
-    fi
-
-    cd /tmp
+else
+    echo "PulseAudio already installed."
 fi
 
 echo ""

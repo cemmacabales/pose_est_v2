@@ -126,16 +126,23 @@ class TTSEngine:
 
     @staticmethod
     def _probe_alsa():
-        """Return first ALSA hardware device ID (e.g. 'hw:0,0') or None."""
+        """Return best ALSA PCM device ID (e.g. 'sysdefault') or None.
+        Uses aplay -L (PCM listing) instead of aplay -l (hardware listing)
+        so that software mixers like sysdefault/default route to any active
+        output (HDMI, Bluetooth via PulseAudio, etc.)."""
         try:
             out = subprocess.run(
-                ["aplay", "-l"],
+                ["aplay", "-L"],
                 capture_output=True, text=True, timeout=5
             )
+            pcm_names = set()
             for line in out.stdout.split('\n'):
-                m = __import__('re').search(r'card\s+(\d+):.*device\s+(\d+):', line.lower())
-                if m:
-                    return f"hw:{m.group(1)},{m.group(2)}"
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    pcm_names.add(stripped)
+            for preferred in ("sysdefault", "default", "front", "dmix"):
+                if preferred in pcm_names:
+                    return preferred
         except Exception:
             pass
         return None
@@ -197,17 +204,36 @@ class TTSEngine:
             except Exception:
                 pass
 
+        # Linux: try ffmpeg → wav → aplay (system default, no -D)
+        try:
+            wav_path = filepath.rsplit('.', 1)[0] + '.wav'
+            subprocess.run(
+                ['ffmpeg', '-i', filepath, '-y', '-loglevel', 'error', wav_path],
+                timeout=15
+            )
+            if os.path.exists(wav_path) and os.path.getsize(wav_path) > 0:
+                subprocess.run(['aplay', wav_path])
+                try:
+                    os.remove(wav_path)
+                except OSError:
+                    pass
+                return
+        except Exception:
+            pass
+
         # Last resort — try espeak (or mpg123 for mp3 files)
         text = "Audio playback failed"
         self._speak_fallback(text)
 
     def _speak_fallback(self, text):
-        """System TTS fallback. Uses say (macOS) or espeak (Linux)."""
+        """System TTS fallback. Uses say (macOS) or espeak (Linux).
+        Linux: tries aplay -D <device>, then plain aplay, then espeak raw.
+        If all fail, prints warning and continues gracefully."""
         if sys.platform == "darwin":
             subprocess.run(["say", text])
             return
 
-        # Linux: pipe espeak through aplay if device is known
+        # Linux: try espeak piped through aplay with detected device
         if self._audio_device:
             try:
                 proc = subprocess.Popen(
@@ -223,7 +249,29 @@ class TTSEngine:
             except Exception:
                 pass
 
-        subprocess.run(["espeak", text])
+        # Linux: try espeak piped through aplay without -D (system default)
+        try:
+            proc = subprocess.Popen(
+                ["espeak", "--stdout", text],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+            )
+            subprocess.run(
+                ["aplay"],
+                stdin=proc.stdout, timeout=15
+            )
+            proc.wait()
+            return
+        except Exception:
+            pass
+
+        # Linux: try raw espeak (no audio device needed for some setups)
+        try:
+            subprocess.run(["espeak", text], timeout=15)
+            return
+        except Exception:
+            pass
+
+        print("[TTS] Warning: no audio output available")
 
     # ── Public API ──────────────────────────────────────────────────────────
 
