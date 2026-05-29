@@ -163,7 +163,7 @@ def _run_one_inference_iteration(gui_mod):
 
     gui_mod._classifier_output_queue.put((0, 1, 0.9))
 
-    gui_mod.frame_counter = 7
+    gui_mod.frame_counter = 4
 
     gui_mod.tts.update.reset_mock()
     gui_mod.logger.log_frame.reset_mock()

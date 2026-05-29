@@ -393,18 +393,6 @@ def draw_confidence_bar(confidence):
     if fill_w > 0:
         confidence_canvas.create_rectangle(0, 0, fill_w, 24, fill=color, outline="")
 
-BLAZEPOSE_MAX_DIM = 640
-
-
-def _scale_for_blazepose(raw_frame):
-    h, w = raw_frame.shape[:2]
-    if w <= BLAZEPOSE_MAX_DIM and h <= BLAZEPOSE_MAX_DIM:
-        return raw_frame
-    scale = BLAZEPOSE_MAX_DIM / max(w, h)
-    new_w = int(w * scale)
-    new_h = int(h * scale)
-    return cv2.resize(raw_frame, (new_w, new_h))
-
 
 def update():
     global frame_counter
@@ -424,8 +412,7 @@ def update():
     fps_times.append(now)
 
     timestamp_ms = int(now * 1000)
-    pose_frame = _scale_for_blazepose(raw_frame)
-    lm = pose_est.process_frame(pose_frame, timestamp_ms=timestamp_ms)
+    lm = pose_est.process_frame(raw_frame, timestamp_ms=timestamp_ms)
 
     display_frame = raw_frame.copy()
     disp_h, disp_w = display_frame.shape[:2]
@@ -440,7 +427,7 @@ def update():
         frame_buffer.append(joints)
 
     frame_counter += 1
-    if len(frame_buffer) == 30 and frame_counter % 8 == 0:
+    if len(frame_buffer) == 30 and frame_counter % 5 == 0:
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
         window = angles[np.newaxis, :, :]
