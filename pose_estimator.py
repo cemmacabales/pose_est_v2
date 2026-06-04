@@ -48,9 +48,15 @@ class PoseEstimator:
         model_path = _resolve_model_path(model_complexity)
         if running_mode == "video":
             mode = vision.RunningMode.VIDEO
+        elif running_mode == "live_stream":
+            mode = vision.RunningMode.LIVE_STREAM
         else:
             mode = vision.RunningMode.IMAGE
-        options = vision.PoseLandmarkerOptions(
+
+        self.latest_landmarks = None
+        self._last_submitted_ts = -1
+
+        kwargs = dict(
             base_options=mp_python.BaseOptions(model_asset_path=model_path),
             running_mode=mode,
             num_poses=1,
@@ -59,8 +65,27 @@ class PoseEstimator:
             min_tracking_confidence=min_tracking_confidence,
             output_segmentation_masks=False,
         )
+        if running_mode == "live_stream":
+            kwargs["result_callback"] = self._result_callback
+        options = vision.PoseLandmarkerOptions(**kwargs)
         self.landmarker = vision.PoseLandmarker.create_from_options(options)
         self._video_mode = (running_mode == "video")
+
+    def _result_callback(self, result, output_image, timestamp_ms):
+        if result.pose_landmarks:
+            self.latest_landmarks = result.pose_landmarks[0]
+        else:
+            self.latest_landmarks = None
+
+    def submit_frame(self, frame, timestamp_ms):
+        """Submit a BGR frame for async LIVE_STREAM inference. Returns immediately."""
+        ts = int(timestamp_ms)
+        if ts <= self._last_submitted_ts:
+            return
+        self._last_submitted_ts = ts
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        self.landmarker.detect_async(mp_image, ts)
 
     def process_frame(self, frame, timestamp_ms=None):
         """Run BlazePose on a BGR frame.
@@ -71,7 +96,7 @@ class PoseEstimator:
             result = self.landmarker.detect_for_video(mp_image, int(timestamp_ms))
         else:
             result = self.landmarker.detect(mp_image)
-        if result.pose_landmarks and len(result.pose_landmarks) > 0:
+        if result.pose_landmarks:
             return result.pose_landmarks[0]
         return None
 
