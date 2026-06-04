@@ -46,7 +46,7 @@ args, _ = parser.parse_known_args()
 MODEL_COMPLEXITY = 0 if args.model == "lite" else 1
 print(f"Model: {args.model} (complexity={MODEL_COMPLEXITY})")
 
-pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="video")
+pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="live_stream")
 
 print("Loading classifier...")
 classifier = Interpreter(model_path="./models/classifier.tflite")
@@ -412,7 +412,8 @@ def update():
     fps_times.append(now)
 
     timestamp_ms = int(now * 1000)
-    lm = pose_est.process_frame(raw_frame, timestamp_ms=timestamp_ms)
+    pose_est.submit_frame(raw_frame, timestamp_ms)
+    lm = pose_est.latest_landmarks
 
     display_frame = raw_frame.copy()
     disp_h, disp_w = display_frame.shape[:2]
