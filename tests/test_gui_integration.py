@@ -81,6 +81,7 @@ def gui_mod():
     mock_cv2.CAP_PROP_FRAME_HEIGHT = 4
     mock_cv2.CAP_PROP_BUFFERSIZE = 1
     mock_cv2.COLOR_BGR2RGB = 4
+    mock_cv2.resize.side_effect = lambda img, size: img
 
     mock_tk = MagicMock()
     mock_tk.Tk.return_value = MagicMock()
@@ -140,6 +141,7 @@ def gui_mod():
             "qr_img": mock_qr_img,
             "pose_estimator_cls": mock_pose_estimator_cls,
             "pose_estimator_inst": mock_pose_estimator_inst,
+            "cv2": mock_cv2,
         }
         yield gui
 
@@ -156,6 +158,8 @@ def test_logger_initialized_on_startup(gui_mod):
 
 
 def _run_one_inference_iteration(gui_mod):
+    gui_mod._latest_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+
     dummy_frame = np.zeros((12, 2), dtype=np.float32)
     for _ in range(30):
         gui_mod.frame_buffer.append(dummy_frame)
@@ -207,3 +211,14 @@ def test_end_session_displays_qr_code(gui_mod):
     gui_mod.qrcode.make.assert_called_once()
     url_passed = gui_mod.qrcode.make.call_args[0][0]
     assert ":5000" in url_passed
+
+
+def test_capture_thread_is_alive(gui_mod):
+    assert gui_mod._capture_thread.is_alive()
+
+
+def test_update_skips_when_no_frame_available(gui_mod):
+    gui_mod._latest_frame = None
+    gui_mod.tts.update.reset_mock()
+    gui_mod.update()
+    gui_mod.tts.update.assert_not_called()

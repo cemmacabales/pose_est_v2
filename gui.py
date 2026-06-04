@@ -196,6 +196,22 @@ _actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 print(f"Camera {selected_index}: {_actual_w}x{_actual_h}")
 
+_latest_frame = None
+_frame_lock = threading.Lock()
+
+
+def _capture_worker():
+    global _latest_frame
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            with _frame_lock:
+                _latest_frame = frame
+
+
+_capture_thread = threading.Thread(target=_capture_worker, daemon=True)
+_capture_thread.start()
+
 root = tk.Tk()
 root.title("Pose Estimation")
 root.geometry(f"{_actual_w + SIDEBAR_WIDTH}x{_actual_h}")
@@ -406,9 +422,10 @@ def update():
 
     _attempt_camera_switch()
 
-    ret, raw_frame = cap.read()
-    if not ret:
-        root.after(33, update)
+    with _frame_lock:
+        raw_frame = _latest_frame
+    if raw_frame is None:
+        root.after(10, update)
         return
 
     now = time.time()
