@@ -46,7 +46,7 @@ args, _ = parser.parse_known_args()
 MODEL_COMPLEXITY = 0 if args.model == "lite" else 1
 print(f"Model: {args.model} (complexity={MODEL_COMPLEXITY})")
 
-pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="video")
+pose_est = PoseEstimator(model_complexity=MODEL_COMPLEXITY, running_mode="live_stream")
 
 print("Loading classifier...")
 classifier = Interpreter(model_path="./models/classifier.tflite")
@@ -120,6 +120,7 @@ def on_closing():
     import tkinter.messagebox as mb
     if mb.askyesno("End Session", "Are you sure you want to end the session?"):
         if _session_ended:
+            pose_est.close()
             root.destroy()
         else:
             _end_session(from_closing=True)
@@ -154,6 +155,7 @@ def _end_session(from_closing=False):
     if from_closing:
         def _on_top_closing():
             top.destroy()
+            pose_est.close()
             root.destroy()
         top.protocol("WM_DELETE_WINDOW", _on_top_closing)
         close_btn.config(command=_on_top_closing)
@@ -204,6 +206,7 @@ root.protocol("WM_DELETE_WINDOW", on_closing)
 _running = True
 
 frame_buffer = deque(maxlen=30)
+_last_lm_id = None
 prediction_buffer = deque(maxlen=10)
 
 fps_times = deque(maxlen=30)
@@ -412,7 +415,8 @@ def update():
     fps_times.append(now)
 
     timestamp_ms = int(now * 1000)
-    lm = pose_est.process_frame(raw_frame, timestamp_ms=timestamp_ms)
+    pose_est.submit_frame(raw_frame, timestamp_ms)
+    lm = pose_est.latest_landmarks
 
     display_frame = raw_frame.copy()
     disp_h, disp_w = display_frame.shape[:2]
@@ -422,7 +426,9 @@ def update():
 
     visible = PoseEstimator.count_visible(lm, threshold=0.5)
 
-    if lm is not None:
+    global _last_lm_id
+    if lm is not None and id(lm) != _last_lm_id:
+        _last_lm_id = id(lm)
         joints = PoseEstimator.extract_mapped_joints(lm)
         frame_buffer.append(joints)
 

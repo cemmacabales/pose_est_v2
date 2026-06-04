@@ -34,6 +34,8 @@ def _make_pose_estimator_mock():
     """Return a mock PoseEstimator class with fake BlazePose behavior."""
     mock_inst = MagicMock()
     mock_inst.process_frame.return_value = MagicMock()
+    mock_inst.submit_frame = MagicMock()
+    mock_inst.latest_landmarks = MagicMock()  # non-None so joints get extracted
     mock_inst.draw_landmarks = MagicMock()
 
     mock_cls = MagicMock(return_value=mock_inst)
@@ -183,6 +185,11 @@ def test_inference_loop_calls_logger_log_frame(gui_mod):
     assert args[0] == 0
     assert args[1] == 1
     assert args[2] == pytest.approx(0.9)
+
+
+def test_update_calls_submit_frame(gui_mod):
+    _run_one_inference_iteration(gui_mod)
+    gui_mod._test_mocks["pose_estimator_inst"].submit_frame.assert_called_once()
 
 
 def test_end_session_calls_logger_end_session(gui_mod):
