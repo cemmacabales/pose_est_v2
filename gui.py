@@ -198,15 +198,19 @@ print(f"Camera {selected_index}: {_actual_w}x{_actual_h}")
 
 _latest_frame = None
 _frame_lock = threading.Lock()
+_cap_lock = threading.Lock()
 
 
 def _capture_worker():
     global _latest_frame
     while True:
-        ret, frame = cap.read()
+        with _cap_lock:
+            ret, frame = cap.read()
         if ret:
             with _frame_lock:
                 _latest_frame = frame
+        else:
+            time.sleep(0.01)
 
 
 _capture_thread = threading.Thread(target=_capture_worker, daemon=True)
@@ -301,9 +305,10 @@ def _attempt_camera_switch():
         camera_selector.set(f"Camera {_current_camera_index}")
         return
 
-    cap.release()
-    cap = new_cap
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    with _cap_lock:
+        cap.release()
+        cap = new_cap
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     _current_camera_index = new_index
     _actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
