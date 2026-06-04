@@ -222,3 +222,13 @@ def test_update_skips_when_no_frame_available(gui_mod):
     gui_mod.tts.update.reset_mock()
     gui_mod.update()
     gui_mod.tts.update.assert_not_called()
+
+
+def test_display_dimensions_are_720p(gui_mod):
+    assert gui_mod._DISPLAY_W == 1280
+    assert gui_mod._DISPLAY_H == 720
+
+
+def test_update_resizes_frame_for_display(gui_mod):
+    _run_one_inference_iteration(gui_mod)
+    gui_mod._test_mocks["cv2"].resize.assert_called()

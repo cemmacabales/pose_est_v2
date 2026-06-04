@@ -97,6 +97,8 @@ tts.announce_session_start()
 _session_ended = False
 
 SIDEBAR_WIDTH = 380
+_DISPLAY_W = 1280
+_DISPLAY_H = 720
 
 
 def add_spacer(parent, height):
@@ -218,7 +220,7 @@ _capture_thread.start()
 
 root = tk.Tk()
 root.title("Pose Estimation")
-root.geometry(f"{_actual_w + SIDEBAR_WIDTH}x{_actual_h}")
+root.geometry(f"{_DISPLAY_W + SIDEBAR_WIDTH}x{_DISPLAY_H}")
 root.configure(bg="#1a1a1a")
 root.resizable(False, False)
 root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -232,14 +234,14 @@ prediction_buffer = deque(maxlen=10)
 fps_times = deque(maxlen=30)
 frame_counter = 0
 
-left_panel = tk.Frame(root, width=_actual_w, height=_actual_h, bg="#1a1a1a")
+left_panel = tk.Frame(root, width=_DISPLAY_W, height=_DISPLAY_H, bg="#1a1a1a")
 left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 left_panel.pack_propagate(False)
 
 camera_label = tk.Label(left_panel, bg="#1a1a1a")
 camera_label.pack(expand=True, fill=tk.BOTH)
 
-right_panel = tk.Frame(root, width=SIDEBAR_WIDTH, height=_actual_h, bg="#212121")
+right_panel = tk.Frame(root, width=SIDEBAR_WIDTH, height=_DISPLAY_H, bg="#212121")
 right_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=False)
 right_panel.pack_propagate(False)
 
@@ -314,7 +316,7 @@ def _attempt_camera_switch():
     _actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"Camera {new_index}: {_actual_w}x{_actual_h}")
     camera_status_label.config(text="")
-    _update_layout(_actual_w, _actual_h)
+    _update_layout(_DISPLAY_W, _DISPLAY_H)
 
 
 exercise_header = tk.Label(
@@ -440,8 +442,7 @@ def update():
     pose_est.submit_frame(raw_frame, timestamp_ms)
     lm = pose_est.latest_landmarks
 
-    display_frame = raw_frame.copy()
-    disp_h, disp_w = display_frame.shape[:2]
+    display_frame = cv2.resize(raw_frame, (_DISPLAY_W, _DISPLAY_H))
 
     if lm is not None:
         pose_est.draw_landmarks(display_frame, lm)
