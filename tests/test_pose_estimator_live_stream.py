@@ -14,7 +14,7 @@ def live_estimator():
         from pose_estimator import PoseEstimator
         est = PoseEstimator(running_mode="live_stream")
         est._test_landmarker = fake_lm
-        return est
+        yield est
 
 
 def test_latest_landmarks_starts_none(live_estimator):
