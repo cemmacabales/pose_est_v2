@@ -122,6 +122,7 @@ def on_closing():
     import tkinter.messagebox as mb
     if mb.askyesno("End Session", "Are you sure you want to end the session?"):
         if _session_ended:
+            _stop_capture.set()
             pose_est.close()
             root.destroy()
         else:
@@ -156,6 +157,7 @@ def _end_session(from_closing=False):
     close_btn.pack(pady=10)
     if from_closing:
         def _on_top_closing():
+            _stop_capture.set()
             top.destroy()
             pose_est.close()
             root.destroy()
@@ -201,11 +203,12 @@ print(f"Camera {selected_index}: {_actual_w}x{_actual_h}")
 _latest_frame = None
 _frame_lock = threading.Lock()
 _cap_lock = threading.Lock()
+_stop_capture = threading.Event()
 
 
 def _capture_worker():
     global _latest_frame
-    while True:
+    while not _stop_capture.is_set():
         with _cap_lock:
             ret, frame = cap.read()
         if ret:
@@ -229,6 +232,7 @@ _running = True
 
 frame_buffer = deque(maxlen=30)
 _last_lm_id = None
+_last_submitted_frame = None
 prediction_buffer = deque(maxlen=10)
 
 fps_times = deque(maxlen=30)
@@ -429,11 +433,14 @@ def update():
 
     _attempt_camera_switch()
 
+    global _last_submitted_frame
+
     with _frame_lock:
         raw_frame = _latest_frame
-    if raw_frame is None:
+    if raw_frame is None or raw_frame is _last_submitted_frame:
         root.after(10, update)
         return
+    _last_submitted_frame = raw_frame
 
     now = time.time()
     fps_times.append(now)
