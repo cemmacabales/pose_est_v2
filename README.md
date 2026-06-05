@@ -1,5 +1,9 @@
 # Pose Estimation + Exercise Classifier
 
+Real-time exercise classification running on a Raspberry Pi 5. BlazePose (MediaPipe) extracts 33-landmark pose keypoints from a webcam feed in async LIVE_STREAM mode; a dual-head LSTM classifier identifies 9 functional movement exercises and scores form quality. A post-session RAG chat uses ONNX embeddings + Groq LLM to deliver coaching feedback — no PyTorch on-device.
+
+![Python](https://img.shields.io/badge/python-3.14%20%7C%203.11-blue) ![Platform](https://img.shields.io/badge/platform-RPi%205%20%7C%20macOS-lightgrey) ![MediaPipe](https://img.shields.io/badge/pose-MediaPipe%20BlazePose-green) ![TFLite](https://img.shields.io/badge/model-TFLite%20LSTM-orange)
+
 ## Pipeline Overview
 
 ```
