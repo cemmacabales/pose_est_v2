@@ -14,9 +14,10 @@ preprocess_train_videos.py     # Flatten Person1-5 folders -> canonical filename
     -> export_models.py           # .keras -> .tflite for RPi deployment
 ```
 
-## Models
+## Architecture
 
 - **MediaPipe BlazePose** -- pose estimation (33 landmarks, on-device GPU/Coral support)
+  - Runs in `LIVE_STREAM` mode: frames submitted via `submit_frame()`, results delivered via callback. Non-blocking; avoids the per-frame latency of `IMAGE` mode. See `pose_estimator.py`.
 - **classifier.tflite** -- dual-head LSTM: exercise (9 classes) + quality (correct/incorrect)
   - 174 training videos from 5 people
   - 451,638 windows after augmentation
