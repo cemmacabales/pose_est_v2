@@ -4,16 +4,6 @@ Real-time exercise classification running on a Raspberry Pi 5. BlazePose (MediaP
 
 ![Python](https://img.shields.io/badge/python-3.14%20%7C%203.11-blue) ![Platform](https://img.shields.io/badge/platform-RPi%205%20%7C%20macOS-lightgrey) ![MediaPipe](https://img.shields.io/badge/pose-MediaPipe%20BlazePose-green) ![TFLite](https://img.shields.io/badge/model-TFLite%20LSTM-orange)
 
-## Pipeline Overview
-
-```
-preprocess_train_videos.py     # Flatten Person1-5 folders -> canonical filenames
-    -> extract_video_keypoints.py # BlazePose keypoints -> data/normalized/*.npy
-    -> build_windows.py           # 30-frame windows + 5x augmentation -> X_train.npy
-    -> train_classifier.py        # 2-layer LSTM (9 exercise + 2 quality classes)
-    -> export_models.py           # .keras -> .tflite for RPi deployment
-```
-
 ## Architecture
 
 - **MediaPipe BlazePose** -- pose estimation (33 landmarks, on-device GPU/Coral support)
@@ -23,6 +13,16 @@ preprocess_train_videos.py     # Flatten Person1-5 folders -> canonical filename
   - 451,638 windows after augmentation
   - 9 exercises: Deep Squat, Hurdle Step, Inline Lunge, Side Lunge, Sit to Stand,
     Standing Leg Raise, Shoulder Abduction, Shoulder Extension, Shoulder Scaption
+
+## Pipeline Overview
+
+```
+preprocess_train_videos.py     # Flatten Person1-5 folders -> canonical filenames
+    -> extract_video_keypoints.py # BlazePose keypoints -> data/normalized/*.npy
+    -> build_windows.py           # 30-frame windows + 5x augmentation -> X_train.npy
+    -> train_classifier.py        # 2-layer LSTM (9 exercise + 2 quality classes)
+    -> export_models.py           # .keras -> .tflite for RPi deployment
+```
 
 ## Quick Start (Mac -- Training & Export)
 
@@ -131,7 +131,7 @@ python build_knowledge_base.py
 scp -r data/knowledge_base.json data/embedding_model/ pi@raspberrypi.local:~/pose_est_v2/data/
 ```
 
-### Architecture
+### RAG Stack
 
 | Component | Runs On | Weight |
 |-----------|---------|--------|
