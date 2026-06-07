@@ -45,3 +45,13 @@ def test_compute_motion_returns_scalar():
     angles = batch_keypoints_to_angles(window)
     result = compute_motion(angles)
     assert isinstance(result, float)
+
+
+def test_compute_motion_raises_for_wrong_ndim():
+    with pytest.raises(ValueError, match="2-D"):
+        compute_motion(np.zeros(16, dtype=np.float32))  # 1-D, wrong
+
+
+def test_compute_motion_raises_for_empty_input():
+    with pytest.raises(ValueError, match="at least one frame"):
+        compute_motion(np.zeros((0, 16), dtype=np.float32))
