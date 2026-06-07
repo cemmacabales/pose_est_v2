@@ -99,6 +99,7 @@ _session_ended = False
 
 rep_counter = RepCounter()
 _latest_angles = None
+_stable_exercise_name: "str | None" = None
 
 SIDEBAR_WIDTH = 380
 
@@ -417,7 +418,7 @@ def draw_confidence_bar(confidence):
 
 
 def update():
-    global frame_counter, _idle_count, _latest_angles
+    global frame_counter, _idle_count, _latest_angles, _stable_exercise_name
 
     if not _running:
         root.after(33, update)
@@ -476,6 +477,9 @@ def update():
             confidence_label.config(text="0%")
             reps_label.config(text="—")
         else:
+            if _stable_exercise_name is not None:
+                current_reps = rep_counter.update(_stable_exercise_name, _latest_angles)
+                reps_label.config(text=str(current_reps))
             window_in = angles[np.newaxis, :, :]
             if _classifier_input_queue.empty():
                 try:
@@ -512,11 +516,9 @@ def update():
             confidence_label.config(text=f"{int(stable_confidence * 100)}%")
 
             exercise_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
+            _stable_exercise_name = exercise_name
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
-            if _latest_angles is not None:
-                current_reps = rep_counter.update(exercise_name, _latest_angles)
-                reps_label.config(text=str(current_reps))
 
     keypoints_label.config(text=f"{visible} / 33 detected")
 

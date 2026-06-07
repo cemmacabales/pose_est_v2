@@ -117,3 +117,33 @@ def test_update_returns_current_count():
     result = counter.update("Deep Squat", np.zeros(16, dtype=np.float32))
     assert isinstance(result, int)
     assert result >= 0
+
+
+def test_quick_rep_detected():
+    """A rep where peak is held for only a few frames (sparse update rate) must still count."""
+    counter = RepCounter()
+    cfg = EXERCISE_REP_CONFIG["Deep Squat"]
+    neutral_val = cfg["exit"] + 0.1   # 0.9 — clearly above exit threshold
+    peak_val = cfg["enter"] - 0.05    # 0.45 — barely below enter threshold
+    n_feats = len(cfg["features"])
+
+    _drive(counter, "Deep Squat", [neutral_val] * n_feats, n=10)
+    _drive(counter, "Deep Squat", [peak_val]    * n_feats, n=5)
+    _drive(counter, "Deep Squat", [neutral_val] * n_feats, n=5)
+
+    assert counter.get_counts().get("Deep Squat", 0) == 1
+
+
+def test_quick_rep_high_direction_detected():
+    """Same for a 'high'-direction exercise (Shoulder Abduction) with a brief peak."""
+    counter = RepCounter()
+    cfg = EXERCISE_REP_CONFIG["Shoulder Abduction"]
+    neutral_val = cfg["exit"] - 0.1   # -0.7 — clearly below exit threshold
+    peak_val = cfg["enter"] + 0.05    # -0.25 — barely above enter threshold
+    n_feats = len(cfg["features"])
+
+    _drive(counter, "Shoulder Abduction", [neutral_val] * n_feats, n=10)
+    _drive(counter, "Shoulder Abduction", [peak_val]    * n_feats, n=5)
+    _drive(counter, "Shoulder Abduction", [neutral_val] * n_feats, n=5)
+
+    assert counter.get_counts().get("Shoulder Abduction", 0) == 1

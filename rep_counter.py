@@ -12,7 +12,7 @@ EXERCISE_REP_CONFIG = {
     "Shoulder Scaption":   {"features": [4, 5],  "direction": "high", "enter": -0.3, "exit": -0.6},
 }
 
-_EMA_ALPHA = 0.3
+_EMA_ALPHA = 0.5
 
 
 class _ExerciseState:
