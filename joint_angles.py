@@ -173,3 +173,8 @@ def batch_keypoints_to_angles(batch_joints):
     out[:, 15] = ul_R_u[:, 1]           # R leg y
 
     return out
+
+
+def compute_motion(angles: np.ndarray) -> float:
+    """Mean per-feature std deviation across frames. Near 0 = idle, higher = active."""
+    return float(np.std(angles, axis=0).mean())
