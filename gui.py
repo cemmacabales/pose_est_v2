@@ -125,6 +125,7 @@ def on_closing():
     import tkinter.messagebox as mb
     if mb.askyesno("End Session", "Are you sure you want to end the session?"):
         if _session_ended:
+            pose_est.close()
             root.destroy()
         else:
             _end_session(from_closing=True)
@@ -159,6 +160,7 @@ def _end_session(from_closing=False):
     if from_closing:
         def _on_top_closing():
             top.destroy()
+            pose_est.close()
             root.destroy()
         top.protocol("WM_DELETE_WINDOW", _on_top_closing)
         close_btn.config(command=_on_top_closing)
@@ -209,6 +211,7 @@ root.protocol("WM_DELETE_WINDOW", on_closing)
 _running = True
 
 frame_buffer = deque(maxlen=30)
+_last_lm_id = None
 prediction_buffer = deque(maxlen=10)
 
 IDLE_THRESHOLD = 0.03      # mean std below this → idle (tune up if slow exercises trigger idle)
@@ -446,7 +449,9 @@ def update():
 
     visible = PoseEstimator.count_visible(lm, threshold=0.5)
 
-    if lm is not None:
+    global _last_lm_id
+    if lm is not None and id(lm) != _last_lm_id:
+        _last_lm_id = id(lm)
         joints = PoseEstimator.extract_mapped_joints(lm)
         frame_buffer.append(joints)
         if _current_exercise_name is not None:

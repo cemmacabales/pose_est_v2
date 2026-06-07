@@ -70,6 +70,7 @@ class PoseEstimator:
         options = vision.PoseLandmarkerOptions(**kwargs)
         self.landmarker = vision.PoseLandmarker.create_from_options(options)
         self._video_mode = (running_mode == "video")
+        self._live_stream_mode = (running_mode == "live_stream")
 
     def _result_callback(self, result, output_image, timestamp_ms):
         if result.pose_landmarks:
@@ -79,6 +80,8 @@ class PoseEstimator:
 
     def submit_frame(self, frame, timestamp_ms):
         """Submit a BGR frame for async LIVE_STREAM inference. Returns immediately."""
+        if not self._live_stream_mode:
+            raise RuntimeError("submit_frame() requires running_mode='live_stream'")
         ts = int(timestamp_ms)
         if ts <= self._last_submitted_ts:
             return
