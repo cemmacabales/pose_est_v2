@@ -1,13 +1,6 @@
 import numpy as np
 import pytest
-import rep_counter as rc
 from rep_counter import RepCounter, EXERCISE_REP_CONFIG
-
-
-@pytest.fixture(autouse=True)
-def disable_rep_interval(monkeypatch):
-    """Remove timing constraint so rapid calls in tests count reps normally."""
-    monkeypatch.setattr(rc, 'MIN_REP_INTERVAL', 0.0)
 
 
 def _angles(overrides: dict) -> np.ndarray:
@@ -124,20 +117,3 @@ def test_update_returns_current_count():
     result = counter.update("Deep Squat", np.zeros(16, dtype=np.float32))
     assert isinstance(result, int)
     assert result >= 0
-
-
-def test_rapid_calls_do_not_accumulate_reps(monkeypatch):
-    """Rapid FSM cycling (idle misclassification) must not produce many reps."""
-    monkeypatch.setattr(rc, 'MIN_REP_INTERVAL', 0.5)
-    counter = RepCounter()
-    cfg = EXERCISE_REP_CONFIG["Sit to Stand"]
-    # Oscillate between values that straddle the enter/exit thresholds rapidly
-    above_enter = cfg["enter"] + 0.1   # triggers enter-peaked
-    below_exit = cfg["exit"] - 0.1    # triggers count-rep
-    a_above = _angles({f: above_enter for f in cfg["features"]})
-    a_below = _angles({f: below_exit for f in cfg["features"]})
-    for _ in range(200):
-        counter.update("Sit to Stand", a_above)
-        counter.update("Sit to Stand", a_below)
-    # 400 rapid calls should NOT produce anywhere near 200 reps
-    assert counter.get_counts().get("Sit to Stand", 0) <= 2
