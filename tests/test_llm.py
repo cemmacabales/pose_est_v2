@@ -21,6 +21,7 @@ FAKE_SESSION = {
             "frames_incorrect": 60,
             "form_score_pct": 80,
             "avg_confidence": 0.88,
+            "reps": 5,
         },
         {
             "name": "Side Lunge",
@@ -158,3 +159,8 @@ def test_missing_api_key_raises_environment_error(monkeypatch):
     llm_module.GROQ_API_KEY = "test-fake-groq-key"
     with patch("groq.Groq", return_value=MagicMock()):
         importlib.reload(llm_module)
+
+
+def test_build_system_prompt_includes_reps():
+    prompt = build_system_prompt(FAKE_SESSION)
+    assert "Reps: 5" in prompt

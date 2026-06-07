@@ -24,7 +24,7 @@ class SessionLogger:
             }
         self.current_segment["frames"].append({"quality": quality, "confidence": confidence})
 
-    def end_session(self) -> dict:
+    def end_session(self, rep_counts: dict | None = None) -> dict:
         if self.current_segment is not None:
             self.segments.append(self.current_segment)
 
@@ -50,7 +50,8 @@ class SessionLogger:
                 "frames_correct": frames_correct,
                 "frames_incorrect": frames_incorrect,
                 "form_score_pct": form_score_pct,
-                "avg_confidence": avg_confidence
+                "avg_confidence": avg_confidence,
+                "reps": (rep_counts or {}).get(segment["name"], 0),
             })
 
         overall_form_score_pct = int(sum(e["form_score_pct"] for e in exercises) / len(exercises)) if exercises else 0

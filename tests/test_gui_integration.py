@@ -207,3 +207,10 @@ def test_end_session_displays_qr_code(gui_mod):
     gui_mod.qrcode.make.assert_called_once()
     url_passed = gui_mod.qrcode.make.call_args[0][0]
     assert ":5000" in url_passed
+
+
+def test_end_session_passes_rep_counts_to_logger(gui_mod):
+    gui_mod._end_session()
+    call_kwargs = gui_mod.logger.end_session.call_args.kwargs
+    assert "rep_counts" in call_kwargs
+    assert isinstance(call_kwargs["rep_counts"], dict)

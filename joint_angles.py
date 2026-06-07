@@ -173,3 +173,17 @@ def batch_keypoints_to_angles(batch_joints):
     out[:, 15] = ul_R_u[:, 1]           # R leg y
 
     return out
+
+
+def compute_motion(angles: np.ndarray) -> float:
+    """Mean per-feature std deviation across frames. Near 0 = idle, higher = active.
+
+    angles must be 2-D (F, N) where F >= 1 is the number of frames and N is the
+    number of angle features. The caller is responsible for ensuring F >= 1;
+    passing an empty array (F=0) raises ValueError.
+    """
+    if angles.ndim != 2:
+        raise ValueError(f"angles must be 2-D (F, N), got shape {angles.shape}")
+    if angles.shape[0] == 0:
+        raise ValueError("angles must have at least one frame (F >= 1)")
+    return float(np.std(angles, axis=0).mean())
