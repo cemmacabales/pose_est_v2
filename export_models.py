@@ -24,7 +24,8 @@ def convert_classifier() -> None:
     model = tf.keras.models.load_model(CLASSIFIER_KERAS_PATH)
     print("Converting classifier to TFLite ...")
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
+    # No quantization: keeps FULLY_CONNECTED at op-version <= 9, which is
+    # required by the tfjs-tflite alpha.10 WASM runtime.
     tflite_model = converter.convert()
     with open(CLASSIFIER_TFLITE_PATH, "wb") as f:
         f.write(tflite_model)
