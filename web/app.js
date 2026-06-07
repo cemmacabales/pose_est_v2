@@ -59,15 +59,7 @@ async function initModels() {
   drawingUtils = new DrawingUtils(ctx);
 
   statusEl.textContent = 'Loading classifier…';
-  tflite.setWasmPath('./tflite_wasm/');
-  tfliteModel = await tflite.loadTFLiteModel('./models/classifier.tflite');
-
-  // Identify which output head is exercise (size 9) vs quality (size 2)
-  tfliteModel.outputs.forEach((out, i) => {
-    const last = out.shape[out.shape.length - 1];
-    if (last === 9) exerciseOutIdx = i;
-    else if (last === 2) qualityOutIdx = i;
-  });
+  tfliteModel = await tf.loadLayersModel('./models/classifier_tfjs/model.json');
 
   statusEl.textContent = 'Requesting camera…';
 }
