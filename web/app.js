@@ -59,17 +59,7 @@ async function initModels() {
   drawingUtils = new DrawingUtils(ctx);
 
   statusEl.textContent = 'Loading classifier…';
-  tflite.setWasmPath(
-    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/'
-  );
-  tfliteModel = await tflite.loadTFLiteModel('./models/classifier.tflite');
-
-  // Identify which output head is exercise (size 9) vs quality (size 2)
-  tfliteModel.outputs.forEach((out, i) => {
-    const last = out.shape[out.shape.length - 1];
-    if (last === 9) exerciseOutIdx = i;
-    else if (last === 2) qualityOutIdx = i;
-  });
+  tfliteModel = await tf.loadLayersModel('./models/classifier_tfjs/model.json');
 
   statusEl.textContent = 'Requesting camera…';
 }
@@ -252,12 +242,17 @@ function loop(timestampMs) {
 
 // ── boot ─────────────────────────────────────────────────────────────────────
 (async () => {
-  try {
-    await initModels();
-    await startCamera();
-    requestAnimationFrame(loop);
-  } catch (err) {
-    statusEl.textContent = `Error: ${err.message}`;
-    console.error(err);
-  }
+  // Camera and models initialize in parallel; loop starts once camera is ready.
+  // Model failures are logged but don't block the camera feed.
+  const modelP = initModels().catch(err => {
+    console.error('Model init failed:', err);
+    statusEl.textContent = `Model error: ${err.message}`;
+  });
+  const cameraP = startCamera().catch(err => {
+    console.error('Camera init failed:', err);
+    statusEl.textContent = `Camera error: ${err.message}`;
+  });
+  await cameraP;
+  requestAnimationFrame(loop);
+  await modelP; // let model finish loading in background
 })();
