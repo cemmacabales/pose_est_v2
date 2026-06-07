@@ -29,7 +29,7 @@ except ImportError:
 
 from pose_estimator import PoseEstimator
 from joint_map import EXERCISE_NAMES
-from joint_angles import batch_keypoints_to_angles, compute_motion
+from joint_angles import batch_keypoints_to_angles, compute_motion, keypoints_to_angles
 
 from tts_engine import TTSEngine
 from session_logger import SessionLogger
@@ -99,6 +99,7 @@ _session_ended = False
 
 rep_counter = RepCounter()
 _latest_angles = None
+_current_exercise_name = None
 
 SIDEBAR_WIDTH = 380
 
@@ -417,7 +418,7 @@ def draw_confidence_bar(confidence):
 
 
 def update():
-    global frame_counter, _idle_count, _latest_angles
+    global frame_counter, _idle_count, _latest_angles, _current_exercise_name
 
     if not _running:
         root.after(33, update)
@@ -448,6 +449,8 @@ def update():
     if lm is not None:
         joints = PoseEstimator.extract_mapped_joints(lm)
         frame_buffer.append(joints)
+        if _current_exercise_name is not None:
+            rep_counter.update(_current_exercise_name, keypoints_to_angles(joints))
 
     frame_counter += 1
     if len(frame_buffer) == 30 and frame_counter % 5 == 0:
@@ -465,6 +468,7 @@ def update():
         if _idle_count >= IDLE_CONFIRM_COUNT:
             if prev_idle < IDLE_CONFIRM_COUNT:  # just became idle
                 prediction_buffer.clear()
+                _current_exercise_name = None
                 while not _classifier_output_queue.empty():
                     try:
                         _classifier_output_queue.get_nowait()
@@ -488,6 +492,10 @@ def update():
             result = _classifier_output_queue.get_nowait()
             stable_exercise_idx, stable_quality_idx, stable_confidence = result
             prediction_buffer.append(result)
+            # Start counting reps on the very first prediction — don't wait for 5
+            instant_ex = EXERCISE_NAMES.get(stable_exercise_idx)
+            if instant_ex is not None:
+                _current_exercise_name = instant_ex
         except queue.Empty:
             result = None
 
@@ -514,9 +522,9 @@ def update():
             exercise_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
-            if _latest_angles is not None:
-                current_reps = rep_counter.update(exercise_name, _latest_angles)
-                reps_label.config(text=str(current_reps))
+            # Rep counter is driven per-frame above; just read the current count here
+            current_reps = rep_counter.get_counts().get(exercise_name, 0)
+            reps_label.config(text=str(current_reps))
 
     keypoints_label.config(text=f"{visible} / 33 detected")
 
