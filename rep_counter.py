@@ -1,4 +1,7 @@
+import time
 import numpy as np
+
+MIN_REP_INTERVAL = 0.5  # seconds; prevents noise-driven rapid rep counting
 
 EXERCISE_REP_CONFIG = {
     "Deep Squat":          {"features": [2, 3],  "direction": "low",  "enter": 0.5,  "exit": 0.8},
@@ -21,6 +24,7 @@ class _ExerciseState:
         self._smoothed: float | None = None
         self._state = "neutral"
         self.count = 0
+        self._last_rep_time: float = 0.0
 
     def update(self, angles: np.ndarray) -> None:
         raw = float(np.mean(angles[self._cfg["features"]]))
@@ -38,13 +42,17 @@ class _ExerciseState:
                 self._state = "peaked"
             elif self._state == "peaked" and self._smoothed > exit_:
                 self._state = "neutral"
-                self.count += 1
+                if time.time() - self._last_rep_time >= MIN_REP_INTERVAL:
+                    self.count += 1
+                    self._last_rep_time = time.time()
         else:
             if self._state == "neutral" and self._smoothed > enter:
                 self._state = "peaked"
             elif self._state == "peaked" and self._smoothed < exit_:
                 self._state = "neutral"
-                self.count += 1
+                if time.time() - self._last_rep_time >= MIN_REP_INTERVAL:
+                    self.count += 1
+                    self._last_rep_time = time.time()
 
 
 class RepCounter:
