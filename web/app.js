@@ -100,19 +100,16 @@ function extractJoints(landmarks) {
 async function classify(angles) {
   if (classifying || !tfliteModel) return;
   classifying = true;
+  let outputList = null;
   try {
     const inputData = new Float32Array(1 * WINDOW_SIZE * 16);
-    inputData.set(angles);  // angles is already Float32Array length WINDOW_SIZE * 16
+    inputData.set(angles);
     const input = tf.tensor(inputData, [1, WINDOW_SIZE, 16]);
     const rawOutputs = tfliteModel.predict(input);
     input.dispose();
 
-    // rawOutputs may be array or NamedTensorMap
-    const outputList = Array.isArray(rawOutputs)
-      ? rawOutputs
-      : Object.values(rawOutputs);
+    outputList = Array.isArray(rawOutputs) ? rawOutputs : Object.values(rawOutputs);
 
-    // If idx detection failed, try by order
     let exTensor = exerciseOutIdx >= 0 ? outputList[exerciseOutIdx] : null;
     let qualTensor = qualityOutIdx >= 0 ? outputList[qualityOutIdx] : null;
     if (!exTensor || !qualTensor) {
@@ -122,17 +119,16 @@ async function classify(angles) {
         else if (last === 2) qualTensor = t;
       }
     }
+    if (!exTensor || !qualTensor) throw new Error('Model output shape mismatch');
 
-    const exProbs  = await exTensor.data();
+    const exProbs   = await exTensor.data();
     const qualProbs = await qualTensor.data();
-    outputList.forEach(t => t.dispose());
 
     let exIdx = 0, maxP = -1;
     exProbs.forEach((p, i) => { if (p > maxP) { maxP = p; exIdx = i; } });
     const qualIdx = qualProbs[1] > qualProbs[0] ? 1 : 0;
     const conf = maxP;
 
-    // Start rep counting on the very first prediction
     const name = EXERCISE_NAMES[exIdx];
     if (name) currentExercise = name;
 
@@ -140,7 +136,10 @@ async function classify(angles) {
     predBuffer.push({ exIdx, qualIdx, conf });
 
     if (predBuffer.length >= 5) updateUI();
+  } catch (err) {
+    console.error('classify error:', err);
   } finally {
+    if (outputList) outputList.forEach(t => { try { t.dispose(); } catch (_) {} });
     classifying = false;
   }
 }
