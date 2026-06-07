@@ -33,6 +33,7 @@ from joint_angles import batch_keypoints_to_angles, compute_motion
 
 from tts_engine import TTSEngine
 from session_logger import SessionLogger
+from rep_counter import RepCounter
 from session_chat.app import start_server
 import qrcode
 import socket
@@ -96,6 +97,9 @@ tts.announce_session_start()
 
 _session_ended = False
 
+rep_counter = RepCounter()
+_latest_angles = None
+
 SIDEBAR_WIDTH = 380
 
 
@@ -132,7 +136,7 @@ def _end_session(from_closing=False):
     _session_ended = True
     end_session_btn.config(state=tk.DISABLED)
     tts.announce_session_end()
-    session_data = logger.end_session()
+    session_data = logger.end_session(rep_counts=rep_counter.get_counts())
     start_server(session_data)
     ip = _get_local_ip()
     url = f"http://{ip}:5000"
@@ -325,6 +329,20 @@ quality_badge.pack(fill=tk.X)
 
 add_spacer(sidebar, 16)
 
+reps_header = tk.Label(
+    sidebar, text="REPS", font=("Helvetica", 11),
+    fg="#888888", bg="#212121", anchor="w"
+)
+reps_header.pack(fill=tk.X)
+
+reps_label = tk.Label(
+    sidebar, text="—", font=("Helvetica", 22, "bold"),
+    fg="#FFFFFF", bg="#212121", anchor="w"
+)
+reps_label.pack(fill=tk.X)
+
+add_spacer(sidebar, 16)
+
 confidence_header = tk.Label(
     sidebar, text="CONFIDENCE", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
@@ -399,7 +417,7 @@ def draw_confidence_bar(confidence):
 
 
 def update():
-    global frame_counter, _idle_count
+    global frame_counter, _idle_count, _latest_angles
 
     if not _running:
         root.after(33, update)
@@ -436,6 +454,7 @@ def update():
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
         motion = compute_motion(angles)
+        _latest_angles = angles[-1].copy()
 
         prev_idle = _idle_count
         if motion < IDLE_THRESHOLD:
@@ -455,6 +474,7 @@ def update():
             quality_badge.config(text="WAITING", fg="#888888", bg="#333333")
             draw_confidence_bar(0.0)
             confidence_label.config(text="0%")
+            reps_label.config(text="—")
         else:
             window_in = angles[np.newaxis, :, :]
             if _classifier_input_queue.empty():
@@ -494,6 +514,9 @@ def update():
             exercise_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
+            if _latest_angles is not None:
+                current_reps = rep_counter.update(exercise_name, _latest_angles)
+                reps_label.config(text=str(current_reps))
 
     keypoints_label.config(text=f"{visible} / 33 detected")
 

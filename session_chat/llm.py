@@ -65,7 +65,8 @@ def build_system_prompt(session_data: dict, retrieved_chunks: list[dict] = None)
         dur = ex.get("duration_seconds", 0)
         form = ex.get("form_score_pct", 0)
         conf = ex.get("avg_confidence", 0)
-        lines.append(f"- {name}: {dur}s | Form: {form}% | Confidence: {conf}")
+        reps = ex.get("reps", 0)
+        lines.append(f"- {name}: {dur}s | Form: {form}% | Reps: {reps} | Confidence: {conf}")
 
     lines.extend([
         "",

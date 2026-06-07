@@ -87,3 +87,38 @@ def test_duration_is_non_negative(tmp_path):
         logger.log_frame(exercise_idx=0, quality=1, confidence=0.9)
     result = logger.end_session()
     assert result["duration_seconds"] >= 0
+
+
+def test_end_session_with_rep_counts_adds_reps_field(tmp_path):
+    logger = SessionLogger(log_dir=str(tmp_path))
+    for _ in range(10):
+        logger.log_frame(exercise_idx=0, quality=1, confidence=0.9)
+    result = logger.end_session(rep_counts={"Deep Squat": 5})
+    assert result["exercises"][0]["reps"] == 5
+
+
+def test_end_session_rep_counts_defaults_to_zero_when_missing(tmp_path):
+    logger = SessionLogger(log_dir=str(tmp_path))
+    for _ in range(10):
+        logger.log_frame(exercise_idx=0, quality=1, confidence=0.9)
+    result = logger.end_session(rep_counts={})
+    assert result["exercises"][0]["reps"] == 0
+
+
+def test_end_session_no_rep_counts_arg_defaults_to_zero(tmp_path):
+    logger = SessionLogger(log_dir=str(tmp_path))
+    for _ in range(10):
+        logger.log_frame(exercise_idx=0, quality=1, confidence=0.9)
+    result = logger.end_session()
+    assert result["exercises"][0]["reps"] == 0
+
+
+def test_end_session_rep_counts_written_to_json(tmp_path):
+    import json
+    logger = SessionLogger(log_dir=str(tmp_path))
+    for _ in range(10):
+        logger.log_frame(exercise_idx=0, quality=1, confidence=0.9)
+    result = logger.end_session(rep_counts={"Deep Squat": 3})
+    with open(result["log_file"]) as f:
+        on_disk = json.load(f)
+    assert on_disk["exercises"][0]["reps"] == 3
