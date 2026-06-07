@@ -29,10 +29,11 @@ except ImportError:
 
 from pose_estimator import PoseEstimator
 from joint_map import EXERCISE_NAMES
-from joint_angles import batch_keypoints_to_angles
+from joint_angles import batch_keypoints_to_angles, compute_motion, keypoints_to_angles
 
 from tts_engine import TTSEngine
 from session_logger import SessionLogger
+from rep_counter import RepCounter
 from session_chat.app import start_server
 import qrcode
 import socket
@@ -96,6 +97,10 @@ tts.announce_session_start()
 
 _session_ended = False
 
+rep_counter = RepCounter()
+_latest_angles = None
+_current_exercise_name = None
+
 SIDEBAR_WIDTH = 380
 
 
@@ -133,7 +138,7 @@ def _end_session(from_closing=False):
     _session_ended = True
     end_session_btn.config(state=tk.DISABLED)
     tts.announce_session_end()
-    session_data = logger.end_session()
+    session_data = logger.end_session(rep_counts=rep_counter.get_counts())
     start_server(session_data)
     ip = _get_local_ip()
     url = f"http://{ip}:5000"
@@ -208,6 +213,10 @@ _running = True
 frame_buffer = deque(maxlen=30)
 _last_lm_id = None
 prediction_buffer = deque(maxlen=10)
+
+IDLE_THRESHOLD = 0.03      # mean std below this → idle (tune up if slow exercises trigger idle)
+IDLE_CONFIRM_COUNT = 2     # consecutive idle windows required before switching to idle
+_idle_count = 0
 
 fps_times = deque(maxlen=30)
 frame_counter = 0
@@ -324,6 +333,20 @@ quality_badge.pack(fill=tk.X)
 
 add_spacer(sidebar, 16)
 
+reps_header = tk.Label(
+    sidebar, text="REPS", font=("Helvetica", 11),
+    fg="#888888", bg="#212121", anchor="w"
+)
+reps_header.pack(fill=tk.X)
+
+reps_label = tk.Label(
+    sidebar, text="—", font=("Helvetica", 22, "bold"),
+    fg="#FFFFFF", bg="#212121", anchor="w"
+)
+reps_label.pack(fill=tk.X)
+
+add_spacer(sidebar, 16)
+
 confidence_header = tk.Label(
     sidebar, text="CONFIDENCE", font=("Helvetica", 11),
     fg="#888888", bg="#212121", anchor="w"
@@ -398,7 +421,7 @@ def draw_confidence_bar(confidence):
 
 
 def update():
-    global frame_counter
+    global frame_counter, _idle_count, _latest_angles, _current_exercise_name
 
     if not _running:
         root.after(33, update)
@@ -431,23 +454,53 @@ def update():
         _last_lm_id = id(lm)
         joints = PoseEstimator.extract_mapped_joints(lm)
         frame_buffer.append(joints)
+        if _current_exercise_name is not None:
+            rep_counter.update(_current_exercise_name, keypoints_to_angles(joints))
 
     frame_counter += 1
     if len(frame_buffer) == 30 and frame_counter % 5 == 0:
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
-        window = angles[np.newaxis, :, :]
-        if _classifier_input_queue.empty():
-            try:
-                _classifier_input_queue.put_nowait(window)
-            except queue.Full:
-                pass
+        motion = compute_motion(angles)
+        _latest_angles = angles[-1].copy()
 
-    if not _classifier_output_queue.empty():
+        prev_idle = _idle_count
+        if motion < IDLE_THRESHOLD:
+            _idle_count = min(_idle_count + 1, IDLE_CONFIRM_COUNT)
+        else:
+            _idle_count = 0
+
+        if _idle_count >= IDLE_CONFIRM_COUNT:
+            if prev_idle < IDLE_CONFIRM_COUNT:  # just became idle
+                prediction_buffer.clear()
+                _current_exercise_name = None
+                while not _classifier_output_queue.empty():
+                    try:
+                        _classifier_output_queue.get_nowait()
+                    except queue.Empty:
+                        break
+            exercise_label.config(text="Idle")
+            quality_badge.config(text="WAITING", fg="#888888", bg="#333333")
+            draw_confidence_bar(0.0)
+            confidence_label.config(text="0%")
+            reps_label.config(text="—")
+        else:
+            window_in = angles[np.newaxis, :, :]
+            if _classifier_input_queue.empty():
+                try:
+                    _classifier_input_queue.put_nowait(window_in)
+                except queue.Full:
+                    pass
+
+    if _idle_count < IDLE_CONFIRM_COUNT and not _classifier_output_queue.empty():
         try:
             result = _classifier_output_queue.get_nowait()
             stable_exercise_idx, stable_quality_idx, stable_confidence = result
             prediction_buffer.append(result)
+            # Start counting reps on the very first prediction — don't wait for 5
+            instant_ex = EXERCISE_NAMES.get(stable_exercise_idx)
+            if instant_ex is not None:
+                _current_exercise_name = instant_ex
         except queue.Empty:
             result = None
 
@@ -474,6 +527,9 @@ def update():
             exercise_name = EXERCISE_NAMES.get(stable_exercise_idx, "Unknown")
             tts.update(exercise_name, stable_quality_idx, time.time())
             logger.log_frame(stable_exercise_idx, stable_quality_idx, stable_confidence)
+            # Rep counter is driven per-frame above; just read the current count here
+            current_reps = rep_counter.get_counts().get(exercise_name, 0)
+            reps_label.config(text=str(current_reps))
 
     keypoints_label.config(text=f"{visible} / 33 detected")
 
