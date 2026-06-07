@@ -59,9 +59,7 @@ async function initModels() {
   drawingUtils = new DrawingUtils(ctx);
 
   statusEl.textContent = 'Loading classifier…';
-  tflite.setWasmPath(
-    'https://unpkg.com/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/'
-  );
+  tflite.setWasmPath('./tflite_wasm/');
   tfliteModel = await tflite.loadTFLiteModel('./models/classifier.tflite');
 
   // Identify which output head is exercise (size 9) vs quality (size 2)
