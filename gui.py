@@ -437,18 +437,20 @@ def update():
         angles = batch_keypoints_to_angles(window)
         motion = compute_motion(angles)
 
+        prev_idle = _idle_count
         if motion < IDLE_THRESHOLD:
-            _idle_count += 1
+            _idle_count = min(_idle_count + 1, IDLE_CONFIRM_COUNT)
         else:
             _idle_count = 0
 
         if _idle_count >= IDLE_CONFIRM_COUNT:
-            prediction_buffer.clear()
-            while not _classifier_output_queue.empty():
-                try:
-                    _classifier_output_queue.get_nowait()
-                except queue.Empty:
-                    break
+            if prev_idle < IDLE_CONFIRM_COUNT:  # just became idle
+                prediction_buffer.clear()
+                while not _classifier_output_queue.empty():
+                    try:
+                        _classifier_output_queue.get_nowait()
+                    except queue.Empty:
+                        break
             exercise_label.config(text="Idle")
             quality_badge.config(text="WAITING", fg="#888888", bg="#333333")
             draw_confidence_bar(0.0)
@@ -461,7 +463,7 @@ def update():
                 except queue.Full:
                     pass
 
-    if not _classifier_output_queue.empty():
+    if _idle_count < IDLE_CONFIRM_COUNT and not _classifier_output_queue.empty():
         try:
             result = _classifier_output_queue.get_nowait()
             stable_exercise_idx, stable_quality_idx, stable_confidence = result
