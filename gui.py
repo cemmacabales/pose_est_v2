@@ -29,7 +29,7 @@ except ImportError:
 
 from pose_estimator import PoseEstimator
 from joint_map import EXERCISE_NAMES
-from joint_angles import batch_keypoints_to_angles
+from joint_angles import batch_keypoints_to_angles, compute_motion
 
 from tts_engine import TTSEngine
 from session_logger import SessionLogger
@@ -205,6 +205,10 @@ _running = True
 
 frame_buffer = deque(maxlen=30)
 prediction_buffer = deque(maxlen=10)
+
+IDLE_THRESHOLD = 0.03      # mean std below this → idle (tune up if slow exercises trigger idle)
+IDLE_CONFIRM_COUNT = 2     # consecutive idle windows required before switching to idle
+_idle_count = 0
 
 fps_times = deque(maxlen=30)
 frame_counter = 0
@@ -395,7 +399,7 @@ def draw_confidence_bar(confidence):
 
 
 def update():
-    global frame_counter
+    global frame_counter, _idle_count
 
     if not _running:
         root.after(33, update)
@@ -431,12 +435,31 @@ def update():
     if len(frame_buffer) == 30 and frame_counter % 5 == 0:
         window = np.array(frame_buffer, dtype=np.float32)
         angles = batch_keypoints_to_angles(window)
-        window = angles[np.newaxis, :, :]
-        if _classifier_input_queue.empty():
-            try:
-                _classifier_input_queue.put_nowait(window)
-            except queue.Full:
-                pass
+        motion = compute_motion(angles)
+
+        if motion < IDLE_THRESHOLD:
+            _idle_count += 1
+        else:
+            _idle_count = 0
+
+        if _idle_count >= IDLE_CONFIRM_COUNT:
+            prediction_buffer.clear()
+            while not _classifier_output_queue.empty():
+                try:
+                    _classifier_output_queue.get_nowait()
+                except queue.Empty:
+                    break
+            exercise_label.config(text="Idle")
+            quality_badge.config(text="WAITING", fg="#888888", bg="#333333")
+            draw_confidence_bar(0.0)
+            confidence_label.config(text="0%")
+        else:
+            window_in = angles[np.newaxis, :, :]
+            if _classifier_input_queue.empty():
+                try:
+                    _classifier_input_queue.put_nowait(window_in)
+                except queue.Full:
+                    pass
 
     if not _classifier_output_queue.empty():
         try:
