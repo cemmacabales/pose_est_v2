@@ -1,0 +1,80 @@
+[
+  {
+    "query": "What types of physical activity count as aerobic exercise?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.8244123910749335
+  },
+  {
+    "query": "How many days per week should adults do muscle-strengthening exercises?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.8721566803915266
+  },
+  {
+    "query": "What is a Metabolic Equivalent of Task (MET) and how is it used to classify exercise intensity?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.7777777777777778,
+    "AnswerRelevancy": 0.6694603530463428
+  },
+  {
+    "query": "What is the WHO-recommended minimum weekly physical activity for adults aged 18 to 64?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8333333333333334,
+    "AnswerRelevancy": 0.0
+  },
+  {
+    "query": "Is sitting for long periods harmful even if I regularly meet my weekly exercise targets?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.6,
+    "AnswerRelevancy": 0.9961489448586461
+  },
+  {
+    "query": "What distinguishes vigorous-intensity exercise from moderate-intensity exercise?",
+    "ContextRecall": 0.6666666666666666,
+    "Faithfulness": 0.4,
+    "AnswerRelevancy": 0.0
+  },
+  {
+    "query": "What are bone-strengthening activities and why are they important?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.8885074610213516
+  },
+  {
+    "query": "What health benefits come from meeting the WHO physical activity guidelines?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.9835111700727183
+  },
+  {
+    "query": "Do exercises like deep squats and hurdle steps count as muscle-strengthening activities?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.36363636363636365,
+    "AnswerRelevancy": 0.7025592463060027
+  },
+  {
+    "query": "Why is balance training important and who benefits most from it?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.5,
+    "AnswerRelevancy": 0.7954969907313356
+  },
+  {
+    "query": "What is the recommended amount of physical activity for older adults aged 65 and over?",
+    "ContextRecall": 0.5,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.8556747749126027
+  },
+  {
+    "query": "Can I split my weekly exercise target into multiple short sessions throughout the day?",
+    "ContextRecall": 0.0,
+    "Faithfulness": 0.5,
+    "AnswerRelevancy": 0.635912443204579
+  },
+  {
+    "query": "What are the health consequences of being physically inactive?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8888888888888888,
+    "AnswerRelevancy": 0.8917928579645492
+  }
+]
