@@ -1,0 +1,135 @@
+{
+  "version": "1.0",
+  "description": "Synthetic QA dataset for RAG evaluation of the exercise session chatbot. All reference_contexts are exact text excerpts from behaviour_manual.pdf (WHO Physical Activity and Sedentary Behaviour Guidelines, 2020), which is the only document currently indexed in the knowledge base.",
+  "notes": [
+    "ground_truth answers are derived solely from the reference_contexts — no external knowledge used.",
+    "reference_contexts represent ideal retrieval output. Use --live-retrieval in eval_rag.py to test actual retriever performance.",
+    "The knowledge base does NOT yet contain a conditioning manual. Form-specific queries (squat depth, shoulder mechanics) will show low Context Recall — that gap is intentional signal, not a dataset error."
+  ],
+  "source_documents": ["behaviour_manual.pdf"],
+  "exercises_in_scope": [
+    "Deep Squat", "Side Lunge", "Inline Lunge", "Hurdle Step",
+    "Standing Leg Raise", "Shoulder Abduction", "Shoulder Scaption", "Shoulder Extension"
+  ],
+  "samples": [
+    {
+      "id": "q01",
+      "query": "What types of physical activity count as aerobic exercise?",
+      "reference_contexts": [
+        "Aerobic physical activity Activity in which the body's large muscles move in a rhythmic manner for a sustained period of time. Aerobic activity – also called endurance activity – improves cardiorespiratory fitness. Examples include walking, running, swimming, and bicycling.",
+        "Cardiorespiratory fitness (endurance) A health-related component of physical fitness. The ability of the circulatory and respiratory systems to supply oxygen during sustained physical activity. Usually expressed as measured or estimated maximal oxygen uptake (VO2 max)."
+      ],
+      "ground_truth": "Aerobic exercise includes activities where the body's large muscles move rhythmically for a sustained period, improving cardiorespiratory fitness. Examples include walking, running, swimming, and bicycling. These activities are also called endurance activities."
+    },
+    {
+      "id": "q02",
+      "query": "How many days per week should adults do muscle-strengthening exercises?",
+      "reference_contexts": [
+        "Adults should also do muscle-strengthening activities at moderate or greater intensity that involve all major muscle groups on 2 or more days a week, as these provide additional health benefits. Strong recommendation, moderate certainty evidence.",
+        "Muscle-strengthening activity Physical activity and exercise that increase skeletal muscle strength, power, endurance, and mass (e.g. strength training, resistance training, or muscular strength and endurance exercises)."
+      ],
+      "ground_truth": "Adults should perform muscle-strengthening activities at moderate or greater intensity that involve all major muscle groups on 2 or more days per week for additional health benefits."
+    },
+    {
+      "id": "q03",
+      "query": "What is a Metabolic Equivalent of Task (MET) and how is it used to classify exercise intensity?",
+      "reference_contexts": [
+        "The metabolic equivalent of task, or simply metabolic equivalent, is a physiological measure expressing the intensity of physical activities. One MET is the energy equivalent expended by an individual while seated at rest. Moderate-intensity physical activity On an absolute scale, moderate-intensity refers to the physical activity that is performed between 3 and less than 6 times the intensity of rest.",
+        "On an absolute scale, vigorous-intensity refers to physical activity that is performed at 6.0 or more METS. On a scale relative to an individual's personal capacity, vigorous-intensity physical activity is usually a 7 or 8 on a scale of 0-10."
+      ],
+      "ground_truth": "A MET (Metabolic Equivalent of Task) is a physiological measure of exercise intensity, where 1 MET equals energy expended at rest. Moderate-intensity activity falls between 3 and less than 6 METs; vigorous-intensity activity is 6.0 METs or above."
+    },
+    {
+      "id": "q04",
+      "query": "What is the WHO-recommended minimum weekly physical activity for adults aged 18 to 64?",
+      "reference_contexts": [
+        "Adults should do at least 150–300 minutes of moderate-intensity aerobic physical activity; or at least 75–150 minutes of vigorous-intensity aerobic physical activity; or an equivalent combination of moderate- and vigorous-intensity activity throughout the week, for substantial health benefits. Strong recommendation, moderate certainty evidence.",
+        "Doing some physical activity is better than doing none. If adults are not meeting these recommendations, doing some physical activity will benefit their health. Adults should start by doing small amounts of physical activity, and gradually increase the frequency, intensity and duration over time."
+      ],
+      "ground_truth": "WHO recommends adults aged 18–64 accumulate at least 150–300 minutes of moderate-intensity aerobic activity, or 75–150 minutes of vigorous-intensity aerobic activity, or an equivalent combination, per week for substantial health benefits."
+    },
+    {
+      "id": "q05",
+      "query": "Is sitting for long periods harmful even if I regularly meet my weekly exercise targets?",
+      "reference_contexts": [
+        "In adults, higher amounts of sedentary behaviour are associated with the following poor health outcomes: all-cause mortality, cardiovascular disease mortality and cancer mortality and incidence of cardiovascular disease, cancer and type-2 diabetes.",
+        "Adults should limit the amount of time spent being sedentary. Replacing sedentary time with physical activity of any intensity (including light intensity) provides health benefits. Strong recommendation, moderate certainty evidence."
+      ],
+      "ground_truth": "Yes. Prolonged sedentary behaviour is independently linked to all-cause mortality, cardiovascular disease, cancer, and type-2 diabetes in adults — separate from meeting weekly exercise targets. WHO recommends limiting sedentary time throughout the day and replacing it with any level of physical activity."
+    },
+    {
+      "id": "q06",
+      "query": "What distinguishes vigorous-intensity exercise from moderate-intensity exercise?",
+      "reference_contexts": [
+        "The metabolic equivalent of task, or simply metabolic equivalent, is a physiological measure expressing the intensity of physical activities. One MET is the energy equivalent expended by an individual while seated at rest. Moderate-intensity physical activity On an absolute scale, moderate-intensity refers to the physical activity that is performed between 3 and less than 6 times the intensity of rest. On a scale relative to an individual's personal capacity, moderate-intensity physical activity is usually a 5 or 6 on a scale of 0-10.",
+        "On an absolute scale, vigorous-intensity refers to physical activity that is performed at 6.0 or more METS. On a scale relative to an individual's personal capacity, vigorous-intensity physical activity is usually a 7 or 8 on a scale of 0-10."
+      ],
+      "ground_truth": "Moderate-intensity activity is 3 to less than 6 METs, typically felt as a 5–6 effort on a personal scale of 0–10. Vigorous-intensity activity is 6 METs or above, felt as a 7–8 effort. One minute of vigorous activity counts roughly as two minutes of moderate activity toward weekly targets."
+    },
+    {
+      "id": "q07",
+      "query": "What are bone-strengthening activities and why are they important?",
+      "reference_contexts": [
+        "Bone-strengthening activity Physical activity primarily designed to increase the strength of specific sites in bones that make up the skeletal system. Bone-strengthening activities produce an impact or tension force on the bones that promotes bone growth and strength. Running, jumping rope, and lifting weights are examples of bone-strengthening activities."
+      ],
+      "ground_truth": "Bone-strengthening activities produce impact or tension forces on the skeletal system that promote bone growth and increase bone strength. Examples include running, jumping rope, and lifting weights. These activities help reduce fracture risk and maintain skeletal health over time."
+    },
+    {
+      "id": "q08",
+      "query": "What health benefits come from meeting the WHO physical activity guidelines?",
+      "reference_contexts": [
+        "Physical activity confers benefits for the following health outcomes: improved all-cause mortality, cardiovascular disease mortality, incident hypertension, incident site-specific cancers, incident type-2 diabetes, mental health (reduced symptoms of anxiety and depression); cognitive health, and sleep; measures of adiposity may also improve.",
+        "Adults may increase moderate-intensity aerobic physical activity to more than 300 minutes; or do more than 150 minutes of vigorous-intensity aerobic physical activity; or an equivalent combination of moderate- and vigorous-intensity activity throughout the week for additional health benefits."
+      ],
+      "ground_truth": "Meeting WHO physical activity guidelines improves all-cause mortality, cardiovascular disease outcomes, hypertension, risk of several cancers, type-2 diabetes incidence, mental health (anxiety and depression), cognitive health, sleep quality, and measures of body fat. Additional benefits accrue when activity levels exceed the minimum recommended."
+    },
+    {
+      "id": "q09",
+      "query": "Do exercises like deep squats and hurdle steps count as muscle-strengthening activities?",
+      "reference_contexts": [
+        "Muscle-strengthening activity Physical activity and exercise that increase skeletal muscle strength, power, endurance, and mass (e.g. strength training, resistance training, or muscular strength and endurance exercises).",
+        "Many studied interventions combine all types of exercise (aerobic, muscle strengthening, and balance training) into a session, and this has been shown to be effective. An example of a multicomponent physical activity programme is one that incorporates aerobic activity (such as walking), lifting weights (muscle strengthening), and incorporates balance training."
+      ],
+      "ground_truth": "Deep squats and hurdle steps engage major muscle groups against bodyweight resistance, which qualifies them as muscle-strengthening activities — the category covering strength training and resistance-based exercises. They also incorporate balance components, making them a multicomponent exercise similar to combined training programmes shown to be effective."
+    },
+    {
+      "id": "q10",
+      "query": "Why is balance training important and who benefits most from it?",
+      "reference_contexts": [
+        "Balance training Static and dynamic exercises that are designed to improve an individual's ability to withstand challenges from postural sway or destabilizing stimuli caused by self-motion, the environment, or other objects.",
+        "Multicomponent physical activity is important to improve physical function and decrease the risk of falls or injury from a fall. These activities can be done at home or in a structured group setting.",
+        "Examples of balance training can include walking backwards or sideways or standing on one foot while doing an upper body muscle-strengthening activity, such as bicep curls."
+      ],
+      "ground_truth": "Balance training involves static and dynamic exercises that build resistance to postural sway and destabilising stimuli. It is most critical for older adults, where it helps maintain physical function and significantly reduces fall risk and fall-related injury. Examples include sideways walking or single-leg stance combined with arm exercises."
+    },
+    {
+      "id": "q11",
+      "query": "What is the recommended amount of physical activity for older adults aged 65 and over?",
+      "reference_contexts": [
+        "Older adults should do at least 150–300 minutes of moderate-intensity aerobic physical activity; or at least 75–150 minutes of vigorous-intensity aerobic physical activity; or an equivalent combination of moderate- and vigorous-intensity activity throughout the week, for substantial health benefits. Strong recommendation, moderate certainty evidence.",
+        "Older adults should also do muscle-strengthening activities at moderate or greater intensity that involve all major muscle groups on 2 or more days a week, as these provide additional health benefits. Strong recommendation, moderate certainty evidence.",
+        "As part of their weekly physical activity, older adults should do varied multicomponent physical activity that emphasizes functional balance and strength training at moderate or greater intensity, on 3 or more days a week, to enhance functional capacity and to prevent falls. Strong recommendation, moderate certainty evidence."
+      ],
+      "ground_truth": "Older adults aged 65+ should accumulate at least 150–300 minutes of moderate-intensity or 75–150 minutes of vigorous-intensity aerobic activity per week. In addition they should do muscle-strengthening exercises on 2 or more days per week, and multicomponent balance and strength training on 3 or more days per week to prevent falls."
+    },
+    {
+      "id": "q12",
+      "query": "Can I split my weekly exercise target into multiple short sessions throughout the day?",
+      "reference_contexts": [
+        "Doing some physical activity is better than doing none. If adults are not meeting these recommendations, doing some physical activity will benefit their health. Adults should start by doing small amounts of physical activity, and gradually increase the frequency, intensity and duration over time.",
+        "In adults, higher amounts of sedentary behaviour are associated with the following poor health outcomes: all-cause mortality, cardiovascular disease mortality and cancer mortality and incidence of cardiovascular disease, cancer and type-2 diabetes."
+      ],
+      "ground_truth": "Yes. WHO guidelines emphasise that any physical activity is better than none, and that adults should start with small amounts and build gradually. Activity can be accumulated across multiple shorter sessions throughout the day or week — there is no requirement for a single continuous bout to achieve health benefits."
+    },
+    {
+      "id": "q13",
+      "query": "What are the health consequences of being physically inactive?",
+      "reference_contexts": [
+        "Physical inactivity An insufficient physical activity level to meet present physical activity recommendations.",
+        "In adults, higher amounts of sedentary behaviour are associated with the following poor health outcomes: all-cause mortality, cardiovascular disease mortality and cancer mortality and incidence of cardiovascular disease, cancer and type-2 diabetes.",
+        "Physical activity confers benefits for the following health outcomes: improved all-cause mortality, cardiovascular disease mortality, incident hypertension, incident site-specific cancers, incident type-2 diabetes, mental health (reduced symptoms of anxiety and depression); cognitive health, and sleep."
+      ],
+      "ground_truth": "Physical inactivity — failing to meet recommended activity levels — is associated with increased all-cause mortality, cardiovascular disease, cancer incidence and mortality, type-2 diabetes, hypertension, and poorer mental and cognitive health. Meeting physical activity guidelines directly reduces risk across all these outcomes."
+    }
+  ]
+}
