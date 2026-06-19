@@ -283,8 +283,14 @@ EXERCISES = [
             "As you step out, shift your weight toward the stepping leg by pushing your "
             "hips back and bending that knee.",
             "The opposite (straight) leg stays long and extended. You should feel a "
-            "stretch in the inner thigh of the straight leg — that's normal and intentional.",
-            "Keep your chest up. Push your hips back as you bend — do not let the knee "
+            "stretch in the inner thigh of the straight leg -- that's normal and intentional.",
+            "What you should feel during a correct Side Lunge: the primary sensation is a "
+            "deep stretch through the inner thigh (adductor) of the straight leg as it "
+            "extends outward. This is the adductor muscle group being lengthened under "
+            "load. If you feel the stretch in the front of your hip or the back of your "
+            "leg instead, check that your straight leg is fully extended and that you are "
+            "pushing your hips back -- not forward -- as you lower.",
+            "Keep your chest up. Push your hips back as you bend -- do not let the knee "
             "shoot forward first.",
             "Your bent knee should track over your toes (not cave inward).",
             "Your heel on the bent leg must stay flat on the floor throughout.",
@@ -393,15 +399,17 @@ EXERCISES = [
             "Hold the top position for a moment, then lower with control.",
         ],
         "errors": [
-            ("Trunk leaning laterally (away from the raised leg)",
+            ("Trunk leaning sideways or laterally during the Standing Leg Raise (leaning away from the raised leg)",
              "This is a sign that your hip flexors on the raised-leg side are struggling "
-             "to lift the leg without recruiting the trunk as compensation. Reduce the "
-             "height of the raise and focus on keeping your torso vertical. Add seated "
-             "hip flexor strengthening (seated knee raises) to your programme."),
-            ("Hip hiking on the raised-leg side",
-             "The hip should stay level — the pelvis does not tilt. Focus on the cue 'keep "
-             "both hip bones at the same height'. Glute medius weakness on the standing "
-             "side is often the cause."),
+             "to lift the leg without recruiting the trunk as compensation. The torso leans "
+             "away from the raised leg because the hip flexor is too weak to do the work "
+             "alone. Reduce the height of the raise and focus on keeping your torso vertical. "
+             "Add seated hip flexor strengthening (seated knee raises) to your programme."),
+            ("Hip hiking on the raised-leg side during the Standing Leg Raise",
+             "The hip should stay level during the Standing Leg Raise -- the pelvis does "
+             "not tilt. Focus on the cue 'keep both hip bones at the same height'. "
+             "Glute medius weakness on the standing side is often the cause of the hip "
+             "rising on the raised-leg side."),
             ("Loss of balance or hopping to maintain position",
              "Balance improves with consistent practice. Reduce the range of motion and use "
              "fingertip support initially. Practise single-leg standing (without the leg "

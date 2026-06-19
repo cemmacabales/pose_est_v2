@@ -1,80 +1,92 @@
 [
   {
-    "query": "What types of physical activity count as aerobic exercise?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 1.0,
-    "AnswerRelevancy": 0.8244123910749335
+    "query": "My knees keep caving inward during the squat. What should I do?",
+    "ContextRecall": 0.5,
+    "Faithfulness": 0.625,
+    "AnswerRelevancy": 0.622604114380943
   },
   {
-    "query": "How many days per week should adults do muscle-strengthening exercises?",
+    "query": "Why do my heels lift off the floor when I squat?",
     "ContextRecall": 1.0,
-    "Faithfulness": 1.0,
-    "AnswerRelevancy": 0.8721566803915266
+    "Faithfulness": 0.8,
+    "AnswerRelevancy": 0.8573706863742155
   },
   {
-    "query": "What is a Metabolic Equivalent of Task (MET) and how is it used to classify exercise intensity?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 0.7777777777777778,
-    "AnswerRelevancy": 0.6694603530463428
+    "query": "I keep losing my balance during the hurdle step. What am I doing wrong?",
+    "ContextRecall": 0.0,
+    "Faithfulness": 0.6428571428571429,
+    "AnswerRelevancy": 0.6212297999259087
   },
   {
-    "query": "What is the WHO-recommended minimum weekly physical activity for adults aged 18 to 64?",
+    "query": "What makes shoulder scaption different from a normal lateral raise?",
     "ContextRecall": 1.0,
     "Faithfulness": 0.8333333333333334,
-    "AnswerRelevancy": 0.0
+    "AnswerRelevancy": 0.9699339656007031
   },
   {
-    "query": "Is sitting for long periods harmful even if I regularly meet my weekly exercise targets?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 0.6,
-    "AnswerRelevancy": 0.9961489448586461
+    "query": "My shoulders always shrug up during shoulder exercises. How do I stop that?",
+    "ContextRecall": 0.8571428571428571,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.6790292425120056
   },
   {
-    "query": "What distinguishes vigorous-intensity exercise from moderate-intensity exercise?",
+    "query": "How many sets and reps should I do for these exercises?",
     "ContextRecall": 0.6666666666666666,
-    "Faithfulness": 0.2,
-    "AnswerRelevancy": 0.0
+    "Faithfulness": 0.14285714285714285,
+    "AnswerRelevancy": 0.5375010225645558
   },
   {
-    "query": "What are bone-strengthening activities and why are they important?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 1.0,
-    "AnswerRelevancy": 0.8885074610213516
-  },
-  {
-    "query": "What health benefits come from meeting the WHO physical activity guidelines?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 1.0,
-    "AnswerRelevancy": 0.9835111700727183
-  },
-  {
-    "query": "Do exercises like deep squats and hurdle steps count as muscle-strengthening activities?",
-    "ContextRecall": 1.0,
-    "Faithfulness": 0.36363636363636365,
-    "AnswerRelevancy": 0.7025592463060027
-  },
-  {
-    "query": "Why is balance training important and who benefits most from it?",
+    "query": "How often should I train and do I need rest days?",
     "ContextRecall": 1.0,
     "Faithfulness": 0.375,
-    "AnswerRelevancy": 0.8171835722770892
+    "AnswerRelevancy": 0.4883471921081657
   },
   {
-    "query": "What is the recommended amount of physical activity for older adults aged 65 and over?",
-    "ContextRecall": 0.5,
-    "Faithfulness": 1.0,
-    "AnswerRelevancy": 0.8556747749126027
-  },
-  {
-    "query": "Can I split my weekly exercise target into multiple short sessions throughout the day?",
-    "ContextRecall": 0.3333333333333333,
-    "Faithfulness": 0.2857142857142857,
-    "AnswerRelevancy": 0.37942282418033274
-  },
-  {
-    "query": "What are the health consequences of being physically inactive?",
+    "query": "What is the correct way to breathe during exercise?",
     "ContextRecall": 1.0,
-    "Faithfulness": 0.8888888888888888,
-    "AnswerRelevancy": 0.8917928579645492
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.7705025218373982
+  },
+  {
+    "query": "My inline lunge is really wobbly. How do I improve it?",
+    "ContextRecall": 0.5384615384615384,
+    "Faithfulness": 0.8235294117647058,
+    "AnswerRelevancy": 0.8412759309426727
+  },
+  {
+    "query": "I keep leaning sideways during the standing leg raise. What is causing this?",
+    "ContextRecall": NaN,
+    "Faithfulness": 0.2857142857142857,
+    "AnswerRelevancy": 0.16667244828562996
+  },
+  {
+    "query": "How long should I rest between sets?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.9881167799389297
+  },
+  {
+    "query": "My sit to stand is lopsided — one side pushes more than the other. How do I fix this?",
+    "ContextRecall": 0.14285714285714285,
+    "Faithfulness": 0.47058823529411764,
+    "AnswerRelevancy": 0.45957264003158
+  },
+  {
+    "query": "What should I feel in my body during a correct side lunge?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8571428571428571,
+    "AnswerRelevancy": 0.9738315312210029
+  },
+  {
+    "query": "My shoulder extension feels like it is coming from my lower back rather than my shoulder. How do I fix that?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8333333333333334,
+    "AnswerRelevancy": 0.27928481905436486
+  },
+  {
+    "query": "What should the bottom of a deep squat look like?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.875,
+    "AnswerRelevancy": 0.9045444312351177
   }
 ]

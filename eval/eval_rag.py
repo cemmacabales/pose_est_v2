@@ -120,13 +120,20 @@ def build_ragas_embeddings():
 
 # ── Response generation ───────────────────────────────────────────────────────
 
-# Minimal session stub so build_system_prompt doesn't need real session data.
+# Realistic session stub so the LLM can answer session-specific questions
+# (e.g. sets/reps for these exercises) without refusing due to an empty exercise list.
 _EVAL_SESSION_STUB = {
-    "date": "eval",
-    "duration_seconds": 0,
-    "overall_form_score_pct": 0,
-    "total_exercises_detected": 0,
-    "exercises": [],
+    "date": "2026-01-15",
+    "duration_seconds": 1800,
+    "overall_form_score_pct": 71,
+    "total_exercises_detected": 5,
+    "exercises": [
+        {"name": "Deep Squat", "duration_seconds": 240, "form_score_pct": 72},
+        {"name": "Hurdle Step", "duration_seconds": 210, "form_score_pct": 65},
+        {"name": "Inline Lunge", "duration_seconds": 240, "form_score_pct": 70},
+        {"name": "Standing Leg Raise", "duration_seconds": 180, "form_score_pct": 68},
+        {"name": "Side Lunge", "duration_seconds": 200, "form_score_pct": 75},
+    ],
 }
 
 
