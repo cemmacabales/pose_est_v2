@@ -31,8 +31,9 @@ eval/train_videos_flat/
 !eval/*.py
 trained_videos/
 
-# ── Colab notebook contains a live ngrok auth token, never commit ──
+# ── Colab notebooks contain live tokens/API keys, never commit ──
 eval/colab_ollama_setup.ipynb
+eval/colab_inprocess_eval.ipynb
 
 # ── Data collection checklists ──
 data_collection/
