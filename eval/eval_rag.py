@@ -28,6 +28,10 @@ Usage:
 
   # Use OpenAI instead of Groq for Ragas scoring:
   python eval/eval_rag.py --ragas-llm openai
+
+  # Use a free Ollama instance (e.g. tunneled from Google Colab) for Ragas scoring:
+  #   set OLLAMA_BASE_URL to the tunnel URL + /v1 before running:
+  python eval/eval_rag.py --generate-responses --ragas-llm ollama
 """
 
 import argparse
@@ -94,6 +98,37 @@ def build_ragas_llm(backend: str):
             sys.exit(1)
         client = AsyncOpenAI(api_key=api_key)
         return llm_factory("gpt-4o-mini", client=client)
+
+    if backend == "ollama":
+        import httpx
+
+        base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        model = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+        # Long-running requests through the ngrok tunnel (multi-thousand-token
+        # generations) can outlast ngrok's idle keep-alive window. httpx then
+        # reuses a connection ngrok already closed, which hangs forever with no
+        # error. max_keepalive_connections=0 forces a fresh connection per
+        # request instead of reusing a possibly-dead one; the explicit timeout
+        # is a backstop so any unexpected hang fails loudly instead of forever.
+        http_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=0, max_connections=5),
+            timeout=httpx.Timeout(120.0, connect=15.0),
+        )
+        # Ollama's OpenAI-compatible endpoint ignores the API key but the client requires one.
+        # ngrok's free tier serves an HTML interstitial instead of proxying through unless
+        # this header is present on every request.
+        client = AsyncOpenAI(
+            api_key="ollama",
+            base_url=base_url,
+            default_headers={"ngrok-skip-browser-warning": "true"},
+            http_client=http_client,
+            timeout=120.0,
+        )
+        # llama3.1:8b is far more verbose than Groq's hosted instance at default
+        # settings, padding every classification with long-winded reasoning and
+        # blowing through max_tokens on samples with many ground-truth statements.
+        # temperature=0 makes it answer more directly instead of elaborating.
+        return llm_factory(model, client=client, temperature=0.0)
 
     raise ValueError(f"Unknown ragas-llm backend: {backend!r}")
 
@@ -204,9 +239,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--ragas-llm",
-        choices=["openai", "groq"],
+        choices=["openai", "groq", "ollama"],
         default="groq",
-        help="LLM backend for Ragas scoring (default: groq). GROQ_API_KEY must be set.",
+        help=(
+            "LLM backend for Ragas scoring (default: groq). GROQ_API_KEY must be set. "
+            "ollama requires OLLAMA_BASE_URL (e.g. an ngrok tunnel to a Colab instance) "
+            "and optionally OLLAMA_MODEL (default: llama3.1:8b)."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -335,8 +374,11 @@ def main() -> None:
     all_scores: dict[str, list] = {m.__class__.__name__: [] for m in metrics}
     per_sample_rows = []
 
+    # Groq's free tier needs a gap to stay under 6k TPM; Ollama/OpenAI don't.
+    inter_sample_delay = 2 if args.ragas_llm == "groq" else 0
+
     for metric in metrics:
-        print(f"  Scoring {metric.__class__.__name__} (sequential to respect rate limits)...")
+        print(f"  Scoring {metric.__class__.__name__} (sequential)...")
         required = set(inspect.signature(metric.ascore).parameters) - {"self"}
         scores = []
         for idx, inp in enumerate(inputs):
@@ -348,7 +390,8 @@ def main() -> None:
             except Exception as exc:
                 print(f"    Sample {idx} failed: {exc}")
                 scores.append(float("nan"))
-            time.sleep(2)  # ~2s gap keeps burst well under 6k TPM on free tier
+            if inter_sample_delay:
+                time.sleep(inter_sample_delay)
         all_scores[metric.__class__.__name__] = scores
 
     for i, sample in enumerate(eval_samples):
