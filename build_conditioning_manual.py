@@ -240,10 +240,11 @@ EXERCISES = [
             "the point. Your hip stabilisers are working harder to control the narrow stance.",
         ],
         "errors": [
-            ("Lateral wobble or trunk sway side-to-side",
-             "You are struggling to stabilise on a narrow base. Start by practising a "
-             "slightly wider stance lunge first, then progressively narrow it over sessions. "
-             "Focus on gripping the floor with your toes to improve proprioception."),
+            ("Lateral wobble or trunk sway side-to-side during the Inline Lunge",
+             "You are struggling to stabilise on a narrow base during the Inline Lunge. "
+             "Start by practising a slightly wider stance Inline Lunge first, then "
+             "progressively narrow it over sessions. Focus on gripping the floor with your "
+             "toes to improve proprioception."),
             ("Trunk leaning forward",
              "Keep your chest tall and your hands on your hips to give yourself tactile "
              "feedback. Forward lean is often caused by tight hip flexors — add a kneeling "
@@ -305,10 +306,10 @@ EXERCISES = [
              "Limited ankle mobility is usually the culprit. Until ankle mobility improves, "
              "you can slightly elevate your heel on a small plate. Long-term, add daily "
              "ankle circles and calf stretches."),
-            ("Chest dropping toward the floor at the bottom",
-             "Your hip flexors and upper back are both limiting your ability to stay upright. "
-             "Hold your arms out in front of you at shoulder height during the movement to "
-             "act as a counterbalance and keep your chest tall."),
+            ("Chest dropping toward the floor at the bottom of the Side Lunge",
+             "Your hip flexors and upper back are both limiting your ability to stay upright "
+             "during the Side Lunge. Hold your arms out in front of you at shoulder height "
+             "during the movement to act as a counterbalance and keep your chest tall."),
             ("Inner knee of bent leg caving inward",
              "This is glute medius weakness on the bent-leg side. Push that knee outward "
              "intentionally throughout the rep and add lateral band work between sessions."),
