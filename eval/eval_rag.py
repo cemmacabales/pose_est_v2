@@ -289,6 +289,13 @@ def main() -> None:
         default=str(DEFAULT_OUTPUT_PATH),
         help="Path to write per-sample results JSON (default: eval/rag_results.json).",
     )
+    parser.add_argument(
+        "--no-log",
+        dest="log_metrics",
+        action="store_false",
+        help="Do not append this run to rag_metrics.md (logging is on by default).",
+    )
+    parser.set_defaults(log_metrics=True)
     args = parser.parse_args()
 
     # ── Load ground truth ──────────────────────────────────────────────────────
@@ -463,6 +470,31 @@ def main() -> None:
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(per_sample_rows, f, indent=2, ensure_ascii=False)
     print(f"\nPer-sample results saved to {output_path}")
+
+    # ── Auto-log to rag_metrics.md (the paper's running record) ───────────────
+    if args.log_metrics:
+        if args.ragas_llm == "groq":
+            judge_label = "groq/" + (args.judge_model or _DEFAULT_JUDGE_MODEL["groq"])
+        elif args.ragas_llm == "openai":
+            judge_label = "openai/" + (args.judge_model or _DEFAULT_JUDGE_MODEL["openai"])
+        else:
+            judge_label = "ollama/" + (args.judge_model or os.environ.get("OLLAMA_MODEL", "llama3.1:8b"))
+        try:
+            from eval.log_metrics import append_run
+        except ImportError:
+            from log_metrics import append_run
+        append_run(
+            per_sample_rows,
+            {
+                "label": f"eval_rag.py · judge {judge_label}",
+                "generator": "llama-3.1-8b-instant" if args.generate_responses else "N/A (retrieval only)",
+                "judge": judge_label,
+                "kb": "data/knowledge_base.json",
+                "top_k": 6,
+                "engine": args.ragas_llm,
+            },
+        )
+        print("Run appended to rag_metrics.md")
 
 
 if __name__ == "__main__":
