@@ -15,101 +15,22 @@ Run on Mac or Colab (NOT on RPi 5). Requires:
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
-import fitz  # PyMuPDF
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+# Reuse the heading-aware chunker from build_knowledge_base so the incremental
+# add path and the full-build path stay in lockstep. This file used to carry its
+# own copy of chunk_text (500-char, heading-blind), which is what fragmented the
+# exercise_form_guide.pdf answers — e.g. the "FREQUENCY" heading split from its
+# "Three sessions per week..." body — and tanked retrieval ContextRecall.
+from build_knowledge_base import extract_chunks_from_pdf
 
 DATA_DIR = Path("data")
 KB_PATH = DATA_DIR / "knowledge_base.json"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
-
-
-def table_to_markdown(rows):
-    if not rows:
-        return ""
-    def fmt(cell):
-        return str(cell) if cell is not None else ""
-    header = "| " + " | ".join(fmt(c) for c in rows[0]) + " |"
-    sep = "|" + "|".join([" --- "] * len(rows[0])) + "|"
-    body = "\n".join("| " + " | ".join(fmt(c) for c in row) + " |" for row in rows[1:])
-    return f"{header}\n{sep}\n{body}"
-
-
-def extract_page_text(page):
-    elements = []
-    blocks = page.get_text("blocks")
-    for b in blocks:
-        x0, y0, x1, y1, text, block_no, block_type = b
-        text = text.strip()
-        if text:
-            elements.append((y0, text))
-    try:
-        tables = page.find_tables()
-        for t in tables:
-            y0 = t.bbox[1]
-            rows = t.extract()
-            if rows:
-                elements.append((y0, table_to_markdown(rows)))
-    except Exception:
-        pass
-    elements.sort(key=lambda x: x[0])
-    return "\n\n".join(e[1] for e in elements)
-
-
-def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
-    chunks = []
-    current = ""
-    for para in paragraphs:
-        if len(current) + len(para) + 2 <= chunk_size:
-            current = current + "\n\n" + para if current else para
-        else:
-            if current:
-                chunks.append(current)
-            if len(para) > chunk_size:
-                start = 0
-                while start < len(para):
-                    end = min(start + chunk_size, len(para))
-                    if end < len(para):
-                        while end > start and para[end] not in " \n":
-                            end -= 1
-                        if end == start:
-                            end = min(start + chunk_size, len(para))
-                    chunks.append(para[start:end])
-                    start = end - overlap
-                    if start < 0:
-                        start = 0
-            else:
-                current = para
-    if current:
-        chunks.append(current)
-    return [c.strip() for c in chunks if c.strip()]
-
-
-def extract_chunks_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
-    filename = pdf_path.name
-    all_chunks = []
-    for page_num in range(len(doc)):
-        page = doc.load_page(page_num)
-        page_text = extract_page_text(page)
-        if not page_text.strip():
-            continue
-        for chunk in chunk_text(page_text):
-            all_chunks.append({
-                "text": chunk,
-                "source": filename,
-                "page": page_num + 1,
-                "section_title": "",
-            })
-    doc.close()
-    return all_chunks
 
 
 def main():

@@ -31,8 +31,8 @@ DATA_DIR = Path("data")
 MODEL_DIR = DATA_DIR / "embedding_model"
 KB_PATH = DATA_DIR / "knowledge_base.json"
 
-CHUNK_SIZE = 500          # chars per chunk
-CHUNK_OVERLAP = 50        # overlap between chunks
+CHUNK_SIZE = 1000         # chars per chunk (~250 tokens, well under MAX_SEQ_LENGTH)
+CHUNK_OVERLAP = 100       # overlap between chunks
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MAX_SEQ_LENGTH = 512
 
@@ -77,42 +77,90 @@ def extract_page_text(page):
     return "\n\n".join(e[1] for e in elements)
 
 
+def is_heading(para):
+    """Heuristic: is *para* a section heading rather than body text?
+
+    Headings are short single-line fragments that are either ALL CAPS
+    ("FREQUENCY") or title-case ("Overview", "Exercise 3: Inline Lunge") and
+    do not end in sentence punctuation. Keeping these attached to the body
+    that follows them is what stops e.g. a "FREQUENCY" heading being orphaned
+    from its "Three sessions per week..." answer across a chunk boundary.
+    """
+    s = para.strip()
+    if not s or "\n" in s or len(s) > 60:
+        return False
+    if s[-1] in ".!?":
+        return False
+    if not any(c.isalpha() for c in s):
+        return False
+    if s.isupper():
+        return True
+    words = [w for w in re.split(r"\s+", s) if w]
+    if len(words) > 8:
+        return False
+    capitalized = sum(1 for w in words if w[:1].isupper())
+    return capitalized >= len(words) - 1
+
+
 def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    """Split text into overlapping chunks at paragraph/word boundaries."""
-    # First split into paragraphs
+    """Split text into chunks, keeping section headings attached to the body
+    that follows them and carrying a little overlap across chunk boundaries.
+
+    Returns a list of (chunk_text, section_title) tuples.
+    """
     paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
 
-    chunks = []
-    current = ""
+    chunks = []            # list of (text, section_title)
+    current = []           # paragraphs in the chunk being built
+    current_len = 0
+    section_title = ""     # most recent heading, threaded onto chunks
+
+    def flush(carry_overlap=True):
+        nonlocal current, current_len
+        if not current:
+            return
+        chunks.append(("\n\n".join(current), section_title))
+        # Seed the next chunk with the trailing paragraph so content near a
+        # boundary stays recoverable from both chunks. Never carry a heading
+        # this way — headings are placed explicitly so they lead their body.
+        tail = current[-1]
+        if carry_overlap and overlap > 0 and not is_heading(tail) and len(tail) <= overlap * 4:
+            current, current_len = [tail], len(tail)
+        else:
+            current, current_len = [], 0
 
     for para in paragraphs:
-        if len(current) + len(para) + 2 <= chunk_size:
-            current = current + "\n\n" + para if current else para
-        else:
-            if current:
-                chunks.append(current)
-            # If a single paragraph exceeds chunk_size, split it harder
-            if len(para) > chunk_size:
-                start = 0
-                while start < len(para):
-                    end = min(start + chunk_size, len(para))
-                    if end < len(para):
-                        # Try to break at space
-                        while end > start and para[end] not in " \n":
-                            end -= 1
-                        if end == start:
-                            end = min(start + chunk_size, len(para))
-                    chunks.append(para[start:end])
-                    start = end - overlap
-                    if start < 0:
-                        start = 0
-            else:
-                current = para
+        if is_heading(para):
+            # A heading starts a fresh chunk and stays with what follows it,
+            # never dangling at the tail of the previous chunk.
+            flush(carry_overlap=False)
+            section_title = para
+            current, current_len = [para], len(para)
+            continue
 
-    if current:
-        chunks.append(current)
+        if len(para) > chunk_size:
+            # Oversized paragraph: flush, then hard-split at word boundaries.
+            flush(carry_overlap=False)
+            start = 0
+            while start < len(para):
+                end = min(start + chunk_size, len(para))
+                if end < len(para):
+                    while end > start and para[end] not in " \n":
+                        end -= 1
+                    if end == start:
+                        end = min(start + chunk_size, len(para))
+                chunks.append((para[start:end].strip(), section_title))
+                start = max(end - overlap, start + 1)
+            continue
 
-    return [c.strip() for c in chunks if c.strip()]
+        if current and current_len + len(para) + 2 > chunk_size:
+            flush()
+        current.append(para)
+        current_len += len(para) + 2
+
+    flush(carry_overlap=False)
+
+    return [(c.strip(), st) for c, st in chunks if c.strip()]
 
 
 def extract_chunks_from_pdf(pdf_path):
@@ -127,16 +175,16 @@ def extract_chunks_from_pdf(pdf_path):
         if not page_text.strip():
             continue
 
-        # Detect section headers heuristically: short, all-caps or title-case lines
-        # We just chunk the whole page text
+        # chunk_text keeps section headings attached to their body and returns
+        # the active heading alongside each chunk as section_title.
         page_chunks = chunk_text(page_text)
 
-        for chunk_text_content in page_chunks:
+        for chunk_body, section_title in page_chunks:
             all_chunks.append({
-                "text": chunk_text_content,
+                "text": chunk_body,
                 "source": filename,
                 "page": page_num + 1,
-                "section_title": "",  # Could be improved with heading detection
+                "section_title": section_title,
             })
 
     doc.close()
