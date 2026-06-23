@@ -9,6 +9,49 @@ import numpy as np
 _onnxruntime = None
 _tokenizers = None
 
+# Small per-source nudge applied before ranking. The conditioning manual
+# (broad NSCA content) shares enough vocabulary with exercise-specific
+# questions to crowd out the more precise exercise form guide chunks even
+# when it isn't actually answering the question — e.g. "how often should I
+# train" pulls in unrelated speed-drill/interval-training paragraphs from
+# the conditioning manual alongside the one chunk that actually answers it.
+_SOURCE_BIAS = {
+    "exercise_form_guide.pdf": 0.03,
+    "behaviour_manual.pdf": 0.0,
+    "conditioning_manual.pdf": -0.02,
+}
+
+# Maps each named exercise to substrings that indicate a chunk or query is
+# about it. Used to stop cross-exercise leaks within exercise_form_guide.pdf
+# itself — e.g. a Sit to Stand query pulling in an Inline Lunge wobble-
+# correction chunk just because both mention "wobble"/"imbalance".
+_EXERCISE_TRIGGERS = {
+    "deep squat": ["squat"],
+    "hurdle step": ["hurdle step", "hurdle"],
+    "inline lunge": ["inline lunge"],
+    "side lunge": ["side lunge"],
+    "sit to stand": ["sit to stand", "sit-to-stand"],
+    "standing leg raise": ["leg raise"],
+    "shoulder abduction": ["shoulder abduction", "lateral raise"],
+    "shoulder scaption": ["scaption"],
+    "shoulder extension": ["shoulder extension"],
+}
+
+_EXERCISE_MATCH_BOOST = 0.05
+# Must outweigh _SOURCE_BIAS["exercise_form_guide.pdf"] (0.03), otherwise a
+# wrong-exercise chunk from that same source nets to zero penalty.
+_EXERCISE_MISMATCH_PENALTY = 0.08
+
+
+def _detect_exercises(text: str) -> set[str]:
+    """Return the set of named exercises mentioned in *text* (case-insensitive)."""
+    lowered = text.lower()
+    return {
+        name
+        for name, triggers in _EXERCISE_TRIGGERS.items()
+        if any(t in lowered for t in triggers)
+    }
+
 
 def _get_onnxruntime():
     global _onnxruntime
@@ -76,6 +119,9 @@ class RetrievalEngine:
         self.embeddings = np.array(
             [c["embedding"] for c in self.chunks], dtype=np.float32
         )
+        # Precomputed once at load time so search() doesn't re-scan chunk
+        # text on every call.
+        self._chunk_exercises = [_detect_exercises(c["text"]) for c in self.chunks]
         print(f"[RetrievalEngine] Loaded {len(self.chunks)} chunks, dim={self.embedding_dim}")
 
     def _load_onnx_model(self):
@@ -164,7 +210,21 @@ class RetrievalEngine:
         # Cosine similarity = dot product because both are L2-normalized
         similarities = np.dot(self.embeddings, query_emb.T).flatten()  # (num_chunks,)
 
-        top_indices = np.argsort(similarities)[::-1][:top_k]
+        # Source-aware + exercise-aware re-ranking. Adjusted scores are only
+        # used to pick and order the top_k; the *reported* score stays the
+        # raw cosine similarity so it keeps its normal [-1, 1] meaning.
+        query_exercises = _detect_exercises(query)
+        adjusted = similarities.copy()
+        for i, chunk in enumerate(self.chunks):
+            adjusted[i] += _SOURCE_BIAS.get(chunk["source"], 0.0)
+            if query_exercises:
+                chunk_exercises = self._chunk_exercises[i]
+                if chunk_exercises & query_exercises:
+                    adjusted[i] += _EXERCISE_MATCH_BOOST
+                elif chunk_exercises:
+                    adjusted[i] -= _EXERCISE_MISMATCH_PENALTY
+
+        top_indices = np.argsort(adjusted)[::-1][:top_k]
 
         results = []
         for idx in top_indices:

@@ -1,0 +1,92 @@
+[
+  {
+    "query": "My knees keep caving inward during the squat. What should I do?",
+    "ContextRecall": 0.8,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.632742733075719
+  },
+  {
+    "query": "Why do my heels lift off the floor when I squat?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8,
+    "AnswerRelevancy": 0.8573706863742155
+  },
+  {
+    "query": "I keep losing my balance during the hurdle step. What am I doing wrong?",
+    "ContextRecall": 0.0,
+    "Faithfulness": 0.7272727272727273,
+    "AnswerRelevancy": 0.8086424132361204
+  },
+  {
+    "query": "What makes shoulder scaption different from a normal lateral raise?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8571428571428571,
+    "AnswerRelevancy": 0.9699339656007031
+  },
+  {
+    "query": "My shoulders always shrug up during shoulder exercises. How do I stop that?",
+    "ContextRecall": 0.8571428571428571,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.6790292425120056
+  },
+  {
+    "query": "How many sets and reps should I do for these exercises?",
+    "ContextRecall": 0.6666666666666666,
+    "Faithfulness": 0.5384615384615384,
+    "AnswerRelevancy": 0.38589338623870395
+  },
+  {
+    "query": "How often should I train and do I need rest days?",
+    "ContextRecall": 0.2222222222222222,
+    "Faithfulness": 0.3333333333333333,
+    "AnswerRelevancy": 0.5129576605909855
+  },
+  {
+    "query": "What is the correct way to breathe during exercise?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.8461538461538461,
+    "AnswerRelevancy": 0.7905750339260825
+  },
+  {
+    "query": "My inline lunge is really wobbly. How do I improve it?",
+    "ContextRecall": 0.8571428571428571,
+    "Faithfulness": 0.3,
+    "AnswerRelevancy": 0.8412759309426727
+  },
+  {
+    "query": "I keep leaning sideways during the standing leg raise. What is causing this?",
+    "ContextRecall": NaN,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.8095150321048665
+  },
+  {
+    "query": "How long should I rest between sets?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.9881167799389297
+  },
+  {
+    "query": "My sit to stand is lopsided — one side pushes more than the other. How do I fix this?",
+    "ContextRecall": NaN,
+    "Faithfulness": 0.8333333333333334,
+    "AnswerRelevancy": 0.6253571230759443
+  },
+  {
+    "query": "What should I feel in my body during a correct side lunge?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.9738315312210029
+  },
+  {
+    "query": "My shoulder extension feels like it is coming from my lower back rather than my shoulder. How do I fix that?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 0.9230769230769231,
+    "AnswerRelevancy": 0.7823446986325099
+  },
+  {
+    "query": "What should the bottom of a deep squat look like?",
+    "ContextRecall": 1.0,
+    "Faithfulness": 1.0,
+    "AnswerRelevancy": 0.701524047978339
+  }
+]
