@@ -75,7 +75,20 @@ except ImportError as _e:
     sys.exit(1)
 
 
-def build_ragas_llm(backend: str):
+# Default ragas *judge* model per backend. Deliberately NOT the same as the
+# generator (llama-3.1-8b-instant, the RPi production model under test): an 8B
+# judge parrots the JSON schema back to instructor instead of an instance, so
+# AnswerRelevancy raises and returns nan on every sample, and ContextRecall is
+# unstable (intermittent NaNs). A stronger judge fixes both. The generator stays
+# 8B — only the scoring LLM changes. Override with --judge-model.
+_DEFAULT_JUDGE_MODEL = {
+    "groq": "llama-3.3-70b-versatile",
+    "openai": "gpt-4o-mini",
+    "ollama": None,  # resolved from OLLAMA_MODEL below
+}
+
+
+def build_ragas_llm(backend: str, judge_model: str | None = None):
     """Return a Ragas InstructorLLM via llm_factory using an async client (required by ragas 0.4.x)."""
     from openai import AsyncOpenAI
     from ragas.llms import llm_factory
@@ -85,8 +98,10 @@ def build_ragas_llm(backend: str):
         if not api_key:
             print("GROQ_API_KEY not set. Add it to your .env file.")
             sys.exit(1)
+        model = judge_model or _DEFAULT_JUDGE_MODEL["groq"]
         client = AsyncOpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
-        return llm_factory("llama-3.1-8b-instant", client=client)
+        print(f"  ragas judge: groq/{model}")
+        return llm_factory(model, client=client)
 
     if backend == "openai":
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -96,14 +111,16 @@ def build_ragas_llm(backend: str):
                 "or set OPENAI_API_KEY in your .env file."
             )
             sys.exit(1)
+        model = judge_model or _DEFAULT_JUDGE_MODEL["openai"]
         client = AsyncOpenAI(api_key=api_key)
-        return llm_factory("gpt-4o-mini", client=client)
+        print(f"  ragas judge: openai/{model}")
+        return llm_factory(model, client=client)
 
     if backend == "ollama":
         import httpx
 
         base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-        model = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+        model = judge_model or os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
         # Long-running requests through the ngrok tunnel (multi-thousand-token
         # generations) can outlast ngrok's idle keep-alive window. httpx then
         # reuses a connection ngrok already closed, which hangs forever with no
@@ -248,6 +265,17 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--judge-model",
+        default=None,
+        help=(
+            "Override the ragas judge model (the scoring LLM, NOT the generator). "
+            "Defaults per backend: groq=llama-3.3-70b-versatile, openai=gpt-4o-mini, "
+            "ollama=$OLLAMA_MODEL. A weak 8B judge returns nan for AnswerRelevancy "
+            "(schema echo); the 70B default fixes that. The generated responses are "
+            "always from llama-3.1-8b-instant (the RPi production model under test)."
+        ),
+    )
+    parser.add_argument(
         "--output",
         default=str(DEFAULT_OUTPUT_PATH),
         help="Path to write per-sample results JSON (default: eval/rag_results.json).",
@@ -277,7 +305,7 @@ def main() -> None:
             print("Run build_knowledge_base.py first, or pass --no-live-retrieval to skip retrieval.")
             sys.exit(1)
 
-    ragas_llm = build_ragas_llm(args.ragas_llm)
+    ragas_llm = build_ragas_llm(args.ragas_llm, args.judge_model)
 
     # AnswerRelevancy needs embeddings — load the same model used for the knowledge base.
     ragas_embeddings = None
