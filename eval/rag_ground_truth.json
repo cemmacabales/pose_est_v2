@@ -1,0 +1,157 @@
+{
+  "version": "2.0",
+  "description": "Realistic post-session coaching queries a user would actually ask the exercise chatbot. All reference_contexts are verbatim text from the KB (exercise_form_guide.pdf, conditioning_manual.pdf, or behaviour_manual.pdf). Ground truth answers are grounded solely in those contexts.",
+  "notes": [
+    "v2 replaces the original WHO-guideline-heavy dataset with queries that reflect real chatbot usage: form corrections, set/rep guidance, session design, exercise-specific cues.",
+    "reference_contexts were selected by querying the live RetrievalEngine with top_k=5 and taking the most relevant chunks per query.",
+    "These queries test all three KB sources, not just the WHO manual."
+  ],
+  "samples": [
+    {
+      "id": "q01",
+      "query": "My knees keep caving inward during the squat. What should I do?",
+      "reference_contexts": [
+        "X  Knees caving inward (valgus collapse)\n\n->  Push your knees actively outward as you descend. Think 'spread the floor' with your feet -- try to screw your feet into the ground without actually moving them. Strengthening your glute medius with side-lying clamshells and band walks between sessions will also help.",
+        "X  Front knee collapsing inward\n\n->  Push your front knee outward to align with your second toe throughout the descent. Weak glutes are usually the root cause -- add glute activation work before lunging.",
+        "Most people have one side that is dominant -- stronger, more flexible, or more coordinated. Single-leg and single-arm movements reveal these asymmetries immediately. If you find yourself leaning, rotating, or otherwise compensating more on one side, note it. Over time, unilateral training (one limb at a time) is one of the most effective tools for evening out these imbalances."
+      ],
+      "ground_truth": "Knees caving inward (valgus collapse) is very common and almost always comes from weak glutes. The fix: actively push your knees outward over your toes as you lower down — think 'spread the floor' with your feet without actually moving them. Between sessions, add side-lying clamshells and lateral band walks to strengthen your glute medius, which is the main muscle responsible for keeping the knee tracking correctly."
+    },
+    {
+      "id": "q02",
+      "query": "Why do my heels lift off the floor when I squat?",
+      "reference_contexts": [
+        "X  Heels lifting off the floor\n\n->  This usually means limited ankle dorsiflexion. Elevate your heels slightly on a small plate or folded mat as a temporary workaround, and add daily calf stretches (both straight-leg and bent-knee versions) to improve long-term mobility.",
+        "X  Not reaching adequate depth (not going down far enough)\n\n->  Depth comes from hip and ankle mobility. Work on the goblet squat hold (hold a counterweight in front of your chest and squat into the bottom position, rocking gently). Consistency over weeks is what moves the needle.",
+        "Remember that every athlete's squat will vary based on differences in body types, length of the legs, and flexibility of the ankles. Technique will vary based on differences in stance widths, the use of heel blocks, and positioning of the bar (high or low) on the back."
+      ],
+      "ground_truth": "Heels lifting is almost always a sign of limited ankle dorsiflexion — your calves and ankle joints are too stiff to allow full depth with the heel flat. Short-term fix: elevate your heels slightly on a small plate or folded mat so you can squat with proper mechanics while you work on flexibility. Long-term fix: stretch your calves daily — both with a straight knee and a bent knee to target both the gastrocnemius and soleus. This takes consistent effort over weeks, not days."
+    },
+    {
+      "id": "q03",
+      "query": "I keep losing my balance during the hurdle step. What am I doing wrong?",
+      "reference_contexts": [
+        "The Hurdle Step assesses and trains single-leg stance stability, hip flexor mobility, and pelvis control. It mimics the mechanics of walking and running gait -- specifically the moment when your trail leg swings forward.",
+        "X  Hip drop on the standing leg (Trendelenburg sign)\n\n->  This means your hip abductors (glute medius) are not strong enough to hold the pelvis level during single-leg stance. Add lateral band walks and single-leg glute bridges to your supplementary work. During the movement, consciously squeeze the glute of your standing leg.",
+        "X  Trunk sway or rotation\n\n->  You are compensating for limited hip mobility or core instability. Slow down and perform the step in a more controlled, smaller range until you can maintain a still torso."
+      ],
+      "ground_truth": "Balance issues during the hurdle step usually come from one of two things: glute medius weakness on the standing leg (the hip drops on the side you lift), or limited hip mobility with the core compensating by swaying. Squeeze the glute of your standing leg hard throughout the movement to stabilise the pelvis. If you sway or rotate, slow way down and reduce your range of motion until your torso stays still. Add lateral band walks and single-leg glute bridges between sessions to build the standing-leg strength the exercise demands."
+    },
+    {
+      "id": "q04",
+      "query": "What makes shoulder scaption different from a normal lateral raise?",
+      "reference_contexts": [
+        "Scaption -- raising the arms in the scapular plane rather than directly to the side or directly to the front -- is the most shoulder-friendly version of an overhead raise. The scapular plane sits at roughly 30 degrees in front of the body's lateral line, which is the natural resting position of the shoulder blade. Raising in this plane produces optimal muscle activation and the least joint compression.",
+        "Stand tall, feet hip-width. Hold your arms at your sides with thumbs pointing forward (supinated grip). Your starting position has your arms slightly in front of your body -- roughly 30 degrees forward from your hips. This is already the scapular plane.",
+        "X  Arms internally rotating (thumbs pointing down)\n\n->  Keep the thumbs-up position throughout. This is the defining characteristic of scaption that separates it from standard abduction. If your thumbs rotate inward, you lose the shoulder-protective benefit of the exercise."
+      ],
+      "ground_truth": "The key difference is the plane of movement and the grip. A normal lateral raise goes directly out to the side (90 degrees lateral), while scaption raises in the scapular plane, which is about 30 degrees forward of that. This diagonal is where the shoulder blade naturally sits, so raising in this plane compresses the joint less and activates the muscles more efficiently. The other crucial difference is the thumbs-up grip throughout: keeping your thumbs pointing up externally rotates the shoulder, which opens the joint space and protects the rotator cuff. Letting your thumbs rotate down removes that protection."
+    },
+    {
+      "id": "q05",
+      "query": "My shoulders always shrug up during shoulder exercises. How do I stop that?",
+      "reference_contexts": [
+        "X  Shoulder shrugging (upper trap dominance)\n\n->  This is the most common error. Before each rep, actively pull your shoulders away from your ears. A useful cue: imagine you are trying to put your shoulder blades into your back pockets. If the shrugging persists, reduce the load and focus on isolating the movement.",
+        "- Initiate the movement by gently retracting and depressing your shoulder blades (think: pull your shoulder blades together and then pull them down your back). This sets the scapula in a stable position before the arms move.",
+        "Retract and depress shoulder blades before initiating any shoulder movement. Reduce load if shrug persists."
+      ],
+      "ground_truth": "Shoulder shrugging means your upper trapezius is taking over instead of your deltoids and rotator cuff. Before each rep, actively pull your shoulder blades down and back — imagine trying to tuck them into your back pockets. Hold that position as you raise your arms. If the shrug keeps happening despite that cue, reduce the weight or resistance. The upper trap kicks in when the load is too heavy for the stabilisers to manage — going lighter and building from there is the right fix, not pushing through with bad mechanics."
+    },
+    {
+      "id": "q06",
+      "query": "How many sets and reps should I do for these exercises?",
+      "reference_contexts": [
+        "For most people, two to three sets of each exercise with 45-90 seconds rest between sets is the right starting point. Do not rush the rest -- the quality of each rep matters more than the pace of the workout.",
+        "Perform 8-15 repetitions per set. Start with bodyweight only until you can consistently hit full depth with a neutral spine and flat heels. The Deep Squat is assessed in the Functional Movement Screen (FMS) as a measure of bilateral, symmetrical mobility and stability of the hips, knees, and ankles -- meaning quality matters far more than load.",
+        "Perform 8-12 repetitions per leg. You can alternate legs each step or complete a full set on one side before switching. Add a light dumbbell in each hand once you can maintain perfect alignment for all reps."
+      ],
+      "ground_truth": "A good starting point is 2-3 sets of each exercise. For lower body bilateral movements like the Deep Squat, aim for 8-15 reps per set. For single-leg exercises like the Hurdle Step and Inline Lunge, do 8-12 reps per leg. Upper body and shoulder exercises are typically 10-15 reps. Start with bodyweight only — add load only once you can hit every rep with clean technique. Rest 45-90 seconds between sets."
+    },
+    {
+      "id": "q07",
+      "query": "How often should I train and do I need rest days?",
+      "reference_contexts": [
+        "FREQUENCY\n\nThree sessions per week with at least one rest day between sessions is ideal for most people starting out. Two sessions per week is still highly effective. Daily functional movement practice (bodyweight only, lower intensity) is also beneficial and appropriate for most people as long as they listen to their body and do not train through pain.",
+        "reduce your rep count initially and build back up. A two-week rule is useful: if you cannot perform an exercise correctly for two sessions in a row, go back to the previous progression level and spend more time there."
+      ],
+      "ground_truth": "Three sessions per week with at least one rest day between each session is the recommended starting frequency. Two sessions per week still produces meaningful results. If you want to do something daily, keep it to light bodyweight-only practice at lower intensity — that is fine as long as you are not training through pain. A useful rule: if you cannot perform an exercise with correct form for two sessions in a row, drop back to an easier progression before pushing harder."
+    },
+    {
+      "id": "q08",
+      "query": "What is the correct way to breathe during exercise?",
+      "reference_contexts": [
+        "Before each repetition, take a comfortable breath in and brace your core lightly -- as if someone is about to gently poke your stomach. This intra-abdominal pressure protects your spine throughout the movement. Exhale smoothly through the effort phase (typically the upward or outward phase of the movement). Never hold your breath for multiple reps -- it raises blood pressure unnecessarily and creates tension that limits your range of motion.",
+        "Instruct athletes to exhale through the sticking point and to inhale during the less stressful phase of the repetition. Breath holding (called the Valsalva maneuver) is appropriate in some exercise situations."
+      ],
+      "ground_truth": "Before each rep, breathe in and lightly brace your core — as if bracing for a gentle poke to the stomach. This creates intra-abdominal pressure that protects your spine. Exhale on the effort phase: the push up out of a squat, the drive to stand, the arm raise. The general rule is inhale on the easier (lowering) phase, exhale through the hardest point of the movement. Never hold your breath across multiple reps — it raises blood pressure and stiffens you up, limiting your range of motion."
+    },
+    {
+      "id": "q09",
+      "query": "My inline lunge is really wobbly. How do I improve it?",
+      "reference_contexts": [
+        "X  Lateral wobble or trunk sway side-to-side\n\n->  You are struggling to stabilise on a narrow base. Start by practising a slightly wider stance lunge first, then progressively narrow it over sessions. Focus on gripping the floor with your toes to improve proprioception.",
+        "The 'inline' version -- where both feet land on the same narrow line -- makes it harder than a standard lunge by reducing your base of support.",
+        "X  Trunk leaning forward\n\n->  Keep your chest tall and your hands on your hips to give yourself tactile feedback. Forward lean is often caused by tight hip flexors -- add a kneeling hip flexor stretch to your warm-up."
+      ],
+      "ground_truth": "Wobble in the inline lunge is expected at first — the narrow foot placement deliberately reduces your base of support to challenge your hip stabilisers. The fix is to start wider and progressively narrow. Begin with a standard lunge width where you feel stable, then inch the feet closer together session by session. While lunging, actively grip the floor with your toes — that small action dramatically improves balance through better proprioception. If you are also leaning forward, add a kneeling hip flexor stretch before your session; tight hip flexors pull the torso forward in this movement."
+    },
+    {
+      "id": "q10",
+      "query": "I keep leaning sideways during the standing leg raise. What is causing this?",
+      "reference_contexts": [
+        "X  Trunk leaning laterally (away from the raised leg)\n\n->  This is a sign that your hip flexors on the raised-leg side are struggling to lift the leg without recruiting the trunk as compensation. Reduce the height of the raise and focus on keeping your torso vertical. Add seated hip flexor strengthening (seated knee raises) to your programme.",
+        "X  Hip hiking on the raised-leg side\n\n->  The hip should stay level -- the pelvis does not tilt. Focus on the cue 'keep both hip bones at the same height'. Glute medius weakness on the standing side is often the cause.",
+        "X  Hip drop on the standing leg (Trendelenburg sign)\n\n->  This means your hip abductors (glute medius) are not strong enough to hold the pelvis level during single-leg stance. Add lateral band walks and single-leg glute bridges to your supplementary work."
+      ],
+      "ground_truth": "Lateral trunk lean during the standing leg raise means your hip flexors on the raised leg side are not strong enough to lift the leg independently, so your trunk tilts to assist. The fix: reduce how high you raise the leg until you can keep your torso perfectly vertical at that range, then gradually increase height over time. Add seated knee raises (seated hip flexor strengthening) to build the missing strength. Also check whether your pelvis is tilting — if the hip on the raised side hikes upward, that is glute medius weakness on your standing leg, which needs lateral band work."
+    },
+    {
+      "id": "q11",
+      "query": "How long should I rest between sets?",
+      "reference_contexts": [
+        "For most people, two to three sets of each exercise with 45-90 seconds rest between sets is the right starting point. Do not rush the rest -- the quality of each rep matters more than the pace of the workout.",
+        "FREQUENCY\n\nThree sessions per week with at least one rest day between sessions is ideal for most people starting out. Two sessions per week is still highly effective."
+      ],
+      "ground_truth": "For functional movement exercises like these, rest 45-90 seconds between sets. Do not rush this — the quality of your reps depends on being reasonably recovered before the next set. These are not conditioning circuits where the rest is deliberately kept short; they are skill-based movements where fatigue causes form to break down. If you find your technique deteriorating within a set, that is also a signal to rest longer or reduce the reps."
+    },
+    {
+      "id": "q12",
+      "query": "My sit to stand is lopsided — one side pushes more than the other. How do I fix this?",
+      "reference_contexts": [
+        "X  Rising asymmetrically (one side doing more work)\n\n->  Watch for the hips rotating or one knee pushing out more. Practise single-leg sit-to-stands (keeping one foot slightly raised) to identify and address the weaker side.",
+        "Most people have one side that is dominant -- stronger, more flexible, or more coordinated. Single-leg and single-arm movements reveal these asymmetries immediately. If you find yourself leaning, rotating, or otherwise compensating more on one side, note it. Over time, unilateral training (one limb at a time) is one of the most effective tools for evening out these imbalances."
+      ],
+      "ground_truth": "Asymmetric loading in the sit to stand means one leg is contributing more than the other. The best diagnostic and fix is the same thing: practise single-leg sit-to-stands with the weaker side. Keep one foot slightly raised off the floor and push through the other leg alone. It will be much harder on the weaker side and will show you exactly how large the gap is. Give the weaker side extra practice each session — bilateral exercises allow the stronger side to compensate and can mask the imbalance for a long time."
+    },
+    {
+      "id": "q13",
+      "query": "What should I feel in my body during a correct side lunge?",
+      "reference_contexts": [
+        "As you step out, shift your weight toward the stepping leg by pushing your hips back and bending that knee.\n\n- The opposite (straight) leg stays long and extended. You should feel a stretch in the inner thigh of the straight leg -- that's normal and intentional.",
+        "The Side Lunge is the primary lateral movement pattern in functional training. While most exercises move you forward and backward, lateral strength and stability are equally important for athletic performance and injury prevention. FM 7-22 includes lateral squat movements in conditioning circuits to train the adductors and abductors that often get neglected in standard programmes.",
+        "- Your bent knee should track over your toes (not cave inward).\n\n- Your heel on the bent leg must stay flat on the floor throughout."
+      ],
+      "ground_truth": "In a correct side lunge you should feel two distinct sensations simultaneously: a stretch along the inner thigh of the straight leg (the adductors being lengthened), and a load in the quad and glute of the bent leg (doing the work to lower and push back up). Your bent knee should feel stable and tracking over your toes — not wobbling inward. The heel of the bent leg should stay planted throughout; if it lifts, that breaks the chain. If you only feel it in one place and not both, that is a signal the movement is off."
+    },
+    {
+      "id": "q14",
+      "query": "My shoulder extension feels like it is coming from my lower back rather than my shoulder. How do I fix that?",
+      "reference_contexts": [
+        "X  Trunk leaning forward to create the appearance of greater range\n\n->  The extension should come entirely from the shoulder, not from hinging at the hips. Stand against a wall if needed -- this gives you an immediate reference point for trunk position.",
+        "X  Excessive range (lower back hyperextending)\n\n->  Stay within the range where your torso stays neutral. Excessive extension is not better -- it shifts the movement from the shoulder to the lumbar spine, which is not the intent.",
+        "Shoulder Extension moves the arm backward, behind the body's midline. It strengthens the posterior deltoid, latissimus dorsi, and teres major -- the pulling muscles of the shoulder that are often undertrained relative to the pressing muscles."
+      ],
+      "ground_truth": "When shoulder extension is coming from the lower back, it means you are hinging at the hips or hyperextending the lumbar spine to get extra range — and the shoulder is moving very little. The clearest fix: stand with your back flat against a wall and perform the extension from there. The wall prevents your trunk from moving, so any arm travel has to come from the shoulder joint itself. Start with a smaller range of motion if needed. Going less far with genuine shoulder movement is far more valuable than appearing to go far by arching the back."
+    },
+    {
+      "id": "q15",
+      "query": "What should the bottom of a deep squat look like?",
+      "reference_contexts": [
+        "At the bottom, your hips should ideally be at or below the height of your knees. If you cannot reach this depth without your lower back rounding, stop just above the point where rounding begins.",
+        "X  Heels lifting off the floor\n\n->  This usually means limited ankle dorsiflexion. Elevate your heels slightly on a small plate or folded mat as a temporary workaround, and add daily calf stretches (both straight-leg and bent-knee versions) to improve long-term mobility.",
+        "proper depth is achieved when mid-thigh is parallel to the floor. Common Mistakes: Shins not being vertical, Rounding the back, Dropping down too quickly into the squat (not slow and controlled)."
+      ],
+      "ground_truth": "At the bottom of a correct deep squat, your hips should be at or below the height of your knees — the mid-thigh roughly parallel to the floor is a useful benchmark. Your heels stay flat, your chest stays upright, and your knees track over your toes. Your lower back should maintain a neutral curve — the moment it rounds, you have gone as deep as your current mobility allows and should stop there. Do not bounce out of the bottom; descend slowly and return with control. If your back rounds before you reach parallel, that is the mobility limit to work on."
+    }
+  ]
+}

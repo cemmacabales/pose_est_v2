@@ -1,0 +1,7 @@
+# Dependencies for RAG evaluation only.
+# Do NOT install these on the RPi — evaluation runs on Mac/Colab.
+#
+# Install with:  pip install -r eval/requirements-eval.txt
+ragas==0.4.3            # pinned — 0.4.x API uses llm_factory; see eval_rag.py
+openai                  # Groq and OpenAI both via OpenAI-compatible client
+langchain-community     # transitive ragas dep (must be >=0.4.x)
