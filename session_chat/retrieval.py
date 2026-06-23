@@ -195,7 +195,7 @@ class RetrievalEngine:
 
     # ── Search ────────────────────────────────────────────────────────────────
 
-    def search(self, query: str, top_k: int = 4) -> list[dict]:
+    def search(self, query: str, top_k: int = 6) -> list[dict]:
         """
         Search the knowledge base for chunks relevant to *query*.
 

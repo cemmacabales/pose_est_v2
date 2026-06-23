@@ -324,7 +324,7 @@ def main() -> None:
 
         # Retrieve contexts
         if retriever is not None:
-            raw_chunks = retriever.search(query, top_k=4)
+            raw_chunks = retriever.search(query, top_k=6)
             retrieved_contexts = [c["text"] for c in raw_chunks]
         else:
             retrieved_contexts = item["reference_contexts"]

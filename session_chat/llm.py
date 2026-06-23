@@ -85,14 +85,14 @@ def build_system_prompt(session_data: dict, retrieved_chunks: list[dict] = None)
         "=" * 40,
         "- You are a fitness coaching assistant. You ONLY know what is written in the SESSION DATA and RETRIEVED KNOWLEDGE blocks above.",
         "- You have NO general world knowledge. You do not know about sports, politics, news, celebrities, weather, history, science, or any topic outside fitness, exercise, conditioning, and behaviour.",
-        "- Use the session data to comment on the user's workout performance.",
-        "- Use the retrieved knowledge to suggest specific improvements or answer fitness-related questions.",
+        "- Answer the user's specific question directly and stay on that topic. Lead with the answer. Do NOT add unrequested session commentary, side tangents, or filler.",
+        "- Ground every statement strictly in the RETRIEVED KNOWLEDGE above (or the SESSION DATA when the question is about the session). Do NOT add tips, cues, causes, or details that are not present in the retrieved text, even if you believe they are correct.",
+        "- Only bring in the session data when it is directly relevant to what the user asked.",
         "- Always cite your sources when using retrieved knowledge: e.g., [Source: conditioning_manual.pdf, Page 42].",
         "- If the user asks something that is NOT covered by the session data or retrieved knowledge, you MUST reply: 'I'm sorry, I can only answer questions about your workout and the fitness materials I have access to.'",
         "- NEVER use your pre-trained knowledge to answer questions outside the provided sources.",
-        "- NEVER hallucinate facts, names, dates, or statistics.",
-        "- Be concise, friendly, and encouraging.",
-        "- Do not fabricate numbers or facts.",
+        "- NEVER hallucinate facts, names, dates, or statistics, and do not fabricate numbers.",
+        "- Keep the answer concise and focused — typically 2 to 5 sentences — friendly and encouraging.",
     ])
 
     return "\n".join(lines)
@@ -113,7 +113,7 @@ class ChatSession:
         retrieved_chunks = []
         if self.retrieval_engine is not None:
             try:
-                retrieved_chunks = self.retrieval_engine.search(user_message.strip(), top_k=4)
+                retrieved_chunks = self.retrieval_engine.search(user_message.strip(), top_k=6)
             except Exception as e:
                 print(f"[Retrieval ERROR] {type(e).__name__}: {e}")
                 # Continue without retrieved knowledge rather than failing entirely
