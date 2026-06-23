@@ -276,6 +276,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--metrics",
+        default=None,
+        help=(
+            "Comma-separated subset of ragas metrics to run (e.g. 'AnswerRelevancy'). "
+            "Default: all applicable. Use to iterate on one metric without spending the "
+            "judge's daily token budget on the others."
+        ),
+    )
+    parser.add_argument(
         "--output",
         default=str(DEFAULT_OUTPUT_PATH),
         help="Path to write per-sample results JSON (default: eval/rag_results.json).",
@@ -329,13 +338,23 @@ def main() -> None:
             metrics.append(AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings))
         else:
             print("Note: AnswerRelevancy skipped (ONNX model unavailable for embeddings).")
-        print(f"Metrics: {[m.__class__.__name__ for m in metrics]}")
     else:
         metrics = [ContextRecall(llm=ragas_llm)]
         print(
-            "Metrics: ContextRecall only.\n"
+            "ContextRecall only.\n"
             "Pass --generate-responses to also compute Faithfulness and AnswerRelevancy."
         )
+
+    # Optional metric subset — lets you iterate on one metric (e.g. AnswerRelevancy)
+    # without spending the judge's daily token budget on all three.
+    if args.metrics:
+        wanted = {m.strip().lower() for m in args.metrics.split(",")}
+        metrics = [m for m in metrics if m.__class__.__name__.lower() in wanted]
+        if not metrics:
+            print(f"No metrics matched --metrics {args.metrics!r}. "
+                  f"Choices: ContextRecall, Faithfulness, AnswerRelevancy.")
+            sys.exit(1)
+    print(f"Metrics: {[m.__class__.__name__ for m in metrics]}")
 
     if not args.live_retrieval:
         print(
@@ -426,6 +445,10 @@ def main() -> None:
         row = {"query": sample.user_input}
         for name, scores in all_scores.items():
             row[name] = scores[i]
+        # Persist the generated answer too — needed for the paper and for
+        # diagnosing AnswerRelevancy (noncommittal / off-topic answers).
+        if args.generate_responses:
+            row["response"] = sample.response
         per_sample_rows.append(row)
 
     print("\n=== Aggregate Results ===")
