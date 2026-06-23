@@ -36,6 +36,41 @@ CHUNK_OVERLAP = 100       # overlap between chunks
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MAX_SEQ_LENGTH = 512
 
+# The exercise form guide nests each exercise's body under a fixed set of
+# sub-section headings that never name the exercise themselves. We thread the
+# parent "Exercise N: <name>" heading onto those sub-sections so their chunks
+# (and embeddings) aren't orphaned from the exercise name — e.g. a "Coaching
+# Cues" chunk for the Inline Lunge that, without this, contains no "inline
+# lunge" text and so matches that query weakly and dodges the exercise re-ranker.
+# Short words that title case leaves lowercase; ignored when judging whether a
+# short line is a heading (see is_heading).
+_HEADING_CONNECTORS = {
+    "to", "of", "and", "the", "a", "an", "for", "in", "on", "at",
+    "by", "or", "vs", "per", "with", "from", "it",
+}
+
+_EXERCISE_HEADING_RE = re.compile(r"^\s*Exercise\s+\d+\s*[:\-]", re.IGNORECASE)
+_SUBSECTION_HEADINGS = {
+    "overview",
+    "setup",
+    "coaching cues",
+    "common errors and corrections",
+    "rep guidance",
+}
+
+
+def embedding_text(text, section_title):
+    """Text actually fed to the embedder: a contextual header (the section
+    title, which carries the exercise name) prepended to the chunk body.
+
+    The header is only used to compute the embedding — the stored/displayed
+    chunk text stays raw, so LLM context and citations are unchanged.
+    """
+    section_title = (section_title or "").strip()
+    if not section_title:
+        return text
+    return f"{section_title}\n{text}"
+
 
 def table_to_markdown(rows):
     """Convert PyMuPDF table rows to Markdown."""
@@ -98,15 +133,30 @@ def is_heading(para):
     words = [w for w in re.split(r"\s+", s) if w]
     if len(words) > 8:
         return False
-    capitalized = sum(1 for w in words if w[:1].isupper())
-    return capitalized >= len(words) - 1
+    # Title case lowercases short connector words ("Sit to Stand", "Putting It
+    # Together"), so judge only the significant (alphabetic, non-connector)
+    # words — otherwise a heading like "Exercise 5: Sit to Stand" is misread as
+    # body text and its sub-sections get orphaned from the exercise name.
+    significant = [
+        w for w in words
+        if any(c.isalpha() for c in w) and w.lower() not in _HEADING_CONNECTORS
+    ]
+    if not significant:
+        return False
+    capitalized = sum(1 for w in significant if w[0].isupper())
+    return capitalized >= len(significant) - 1
 
 
-def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
+def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP, start_parent=""):
     """Split text into chunks, keeping section headings attached to the body
     that follows them and carrying a little overlap across chunk boundaries.
 
-    Returns a list of (chunk_text, section_title) tuples.
+    *start_parent* seeds the active "Exercise N: <name>" heading so the parent
+    can be threaded across page boundaries (each PDF page is chunked separately).
+
+    Returns ``(chunks, parent_title)`` where chunks is a list of
+    ``(chunk_text, section_title)`` tuples and parent_title is the exercise
+    heading still in effect at the end (to feed the next page's start_parent).
     """
     paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
 
@@ -114,6 +164,7 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
     current = []           # paragraphs in the chunk being built
     current_len = 0
     section_title = ""     # most recent heading, threaded onto chunks
+    parent_title = start_parent  # active "Exercise N: <name>", threaded onto sub-sections
 
     def flush(carry_overlap=True):
         nonlocal current, current_len
@@ -134,7 +185,17 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
             # A heading starts a fresh chunk and stays with what follows it,
             # never dangling at the tail of the previous chunk.
             flush(carry_overlap=False)
-            section_title = para
+            if _EXERCISE_HEADING_RE.match(para):
+                # New exercise: becomes the parent threaded onto its sub-sections.
+                parent_title = para
+                section_title = para
+            elif para.strip().lower() in _SUBSECTION_HEADINGS:
+                # Sub-section under an exercise: keep the exercise name attached.
+                section_title = f"{parent_title} — {para}" if parent_title else para
+            else:
+                # Any other heading is a new chapter and ends the exercise context.
+                parent_title = ""
+                section_title = para
             current, current_len = [para], len(para)
             continue
 
@@ -160,7 +221,7 @@ def chunk_text(text, chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
 
     flush(carry_overlap=False)
 
-    return [(c.strip(), st) for c, st in chunks if c.strip()]
+    return [(c.strip(), st) for c, st in chunks if c.strip()], parent_title
 
 
 def extract_chunks_from_pdf(pdf_path):
@@ -168,6 +229,8 @@ def extract_chunks_from_pdf(pdf_path):
     doc = fitz.open(pdf_path)
     filename = pdf_path.name
     all_chunks = []
+    parent_title = ""  # threaded across pages so an exercise that spills onto the
+                       # next page keeps tagging its sub-sections with the exercise name
 
     for page_num in range(len(doc)):
         page = doc.load_page(page_num)
@@ -176,8 +239,9 @@ def extract_chunks_from_pdf(pdf_path):
             continue
 
         # chunk_text keeps section headings attached to their body and returns
-        # the active heading alongside each chunk as section_title.
-        page_chunks = chunk_text(page_text)
+        # the active heading alongside each chunk as section_title, plus the
+        # parent exercise heading still active at the page end.
+        page_chunks, parent_title = chunk_text(page_text, start_parent=parent_title)
 
         for chunk_body, section_title in page_chunks:
             all_chunks.append({
@@ -223,7 +287,9 @@ def build_knowledge_base():
     model = SentenceTransformer(EMBEDDING_MODEL)
 
     print("  Embedding chunks...")
-    texts = [c["text"] for c in all_chunks]
+    # Embed each chunk with its section title as a contextual header so
+    # orphaned sub-sections carry the exercise name into the vector.
+    texts = [embedding_text(c["text"], c.get("section_title", "")) for c in all_chunks]
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
 
     # Store embeddings in chunks

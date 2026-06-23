@@ -26,7 +26,7 @@ from sentence_transformers import SentenceTransformer
 # own copy of chunk_text (500-char, heading-blind), which is what fragmented the
 # exercise_form_guide.pdf answers — e.g. the "FREQUENCY" heading split from its
 # "Three sessions per week..." body — and tanked retrieval ContextRecall.
-from build_knowledge_base import extract_chunks_from_pdf
+from build_knowledge_base import embedding_text, extract_chunks_from_pdf
 
 DATA_DIR = Path("data")
 KB_PATH = DATA_DIR / "knowledge_base.json"
@@ -72,7 +72,9 @@ def main():
     model = SentenceTransformer(EMBEDDING_MODEL)
 
     print("  Embedding new chunks...")
-    texts = [c["text"] for c in new_chunks]
+    # Match build_knowledge_base: embed with the section title as a contextual
+    # header so sub-section chunks carry their exercise name into the vector.
+    texts = [embedding_text(c["text"], c.get("section_title", "")) for c in new_chunks]
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
     for i, emb in enumerate(embeddings):
         new_chunks[i]["embedding"] = emb.tolist()

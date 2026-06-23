@@ -120,8 +120,13 @@ class RetrievalEngine:
             [c["embedding"] for c in self.chunks], dtype=np.float32
         )
         # Precomputed once at load time so search() doesn't re-scan chunk
-        # text on every call.
-        self._chunk_exercises = [_detect_exercises(c["text"]) for c in self.chunks]
+        # text on every call. Includes section_title so sub-section chunks
+        # (e.g. "Inline Lunge — Coaching Cues") are still tagged with their
+        # exercise even when the body never names it.
+        self._chunk_exercises = [
+            _detect_exercises(c.get("section_title", "") + " " + c["text"])
+            for c in self.chunks
+        ]
         print(f"[RetrievalEngine] Loaded {len(self.chunks)} chunks, dim={self.embedding_dim}")
 
     def _load_onnx_model(self):
