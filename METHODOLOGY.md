@@ -306,6 +306,32 @@ EarlyStopping triggered at epoch 45. Training exercise accuracy: 97.70%; trainin
 - **No quantization** (required for tfjs-tflite WASM compatibility)
 - Verified with dummy inference before deployment
 
+### 8.4 Session 3: Held-out Generalization Audit
+
+The accuracies in §8.1–8.2 are from an **80/20 split taken at the window level**, where overlapping
+30-frame windows from the same video and subject can fall on both sides → **data leakage**. To measure
+true generalization, a **video-level** held-out evaluation was added (`make_splits.py`,
+`build_windows_split.py`, `train_heldout.py`).
+
+- **Split:** 156 train / 44 test videos; augmentation applied to train only; no video in both splits.
+- **Test strata:** *Internet-26* (the `eval/TEST/` web videos un-folded from training — subject-disjoint,
+  all 9 classes, all `correct`) and *Collected-18* (a stratified holdout incl. incorrect form; subjects
+  overlap training, so its quality number is optimistic).
+- **Per-video prediction** = mean softmax across each video's windows.
+
+| Metric | Window-split val (§8.1–8.2) | Honest held-out (per video) |
+|--------|:---:|:---:|
+| Exercise accuracy | ~97% | **65.4%** (Internet-26, subject-disjoint) |
+| Quality accuracy | ~93% | **~54%** correct-recall on unseen subjects |
+
+**Analysis:** The model is unchanged — the same recipe still reaches ~97% window-level val; the gap is
+measurement honesty, not degradation. The limiting factor is the dataset: only 5 subjects, each exercise
+performed by ≤2 of them, and the three shoulder classes (E07/E08/E10) each from a single subject — so a
+fully subject-disjoint all-class test is impossible without new data. SitToStand (44%) and the quality
+head (false-alarms on unseen subjects) are the concrete weaknesses. Full writeup in
+`results_generalization.md`; per-video breakdown in `eval/results/heldout_eval.md`. The audited model is
+saved separately as `models/classifier_heldout.keras` (production `classifier.keras` is untouched).
+
 ---
 
 ## 9. Real-Time Inference Pipeline
